@@ -33,7 +33,7 @@
 	<IP>*</IP>
 	<PrivacyProtection>false</PrivacyProtection>
 
-	<!-- Resolves ${PublicIP} below via STUN — needed because a container
+	<!-- Resolves ${env:OME_HOST_IP:*} below via STUN — needed because a container
 	     behind Docker/NAT has no public IP on its own interface to
 	     advertise as a WebRTC ICE candidate. -->
 	<StunServer>stun.ovenmediaengine.com:13478</StunServer>
@@ -84,10 +84,10 @@
 					<WorkerCount>1</WorkerCount>
 				</Signalling>
 				<IceCandidates>
-					<IceCandidate>${PublicIP}:10000-10004/udp</IceCandidate>
+					<IceCandidate>${env:OME_HOST_IP:*}:10000-10004/udp</IceCandidate>
 					<!-- TURN-over-TCP relay fallback for streamers/viewers behind
 					     restrictive NATs/firewalls that block UDP outright. -->
-					<TcpRelay>${PublicIP}:3478</TcpRelay>
+					<TcpRelay>${env:OME_HOST_IP:*}:3478</TcpRelay>
 					<TcpForce>false</TcpForce>
 					<TcpRelayWorkerCount>1</TcpRelayWorkerCount>
 				</IceCandidates>
@@ -110,8 +110,8 @@
 					<WorkerCount>1</WorkerCount>
 				</Signalling>
 				<IceCandidates>
-					<IceCandidate>${PublicIP}:10000-10004/udp</IceCandidate>
-					<TcpRelay>${PublicIP}:3478</TcpRelay>
+					<IceCandidate>${env:OME_HOST_IP:*}:10000-10004/udp</IceCandidate>
+					<TcpRelay>${env:OME_HOST_IP:*}:3478</TcpRelay>
 					<TcpForce>false</TcpForce>
 					<TcpRelayWorkerCount>1</TcpRelayWorkerCount>
 				</IceCandidates>
@@ -153,7 +153,7 @@
 		</Host>
 		<API>
 			<!-- Same value goes into config/config.json's ome.apiAccessToken. -->
-			<AccessToken>59e684b28d1c871203ad8414302cd128951986ea7c8772e7d6fcea555b7d5ca8</AccessToken>
+			<AccessToken>${env:OME_API_ACCESS_TOKEN}</AccessToken>
 			<CrossDomains>
 				<Url>*</Url>
 			</CrossDomains>
