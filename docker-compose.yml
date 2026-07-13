@@ -14,8 +14,8 @@ services:
     image: airensoft/ovenmediaengine:latest
     container_name: ome
     restart: unless-stopped
-    environment:
-      - OME_HOST_IP=IPHERE  # optional, only needed if you want to override OME's auto-detected public IP
+    env_file:
+      - .env
     expose:
       - "1935"
       - "9999/udp"
