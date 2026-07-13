@@ -1,5 +1,6 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 const Settings = require("../models/Settings");
 const { loadConfig } = require("../config/loader");
 const { resolveOmePlaybackUrls } = require("../services/omeClient");
@@ -39,7 +40,10 @@ router.post("/setup", async (req, res) => {
     ownerUsername: String(username).trim(),
     ownerEmail: String(email).trim(),
     passwordHash,
-    channelName: String(channelName).trim().toLowerCase()
+    channelName: String(channelName).trim().toLowerCase(),
+    // Generated here, not typed in by hand — shown on the admin dashboard
+    // with a regenerate option (routes/admin.js).
+    streamKey: crypto.randomBytes(24).toString("hex")
   });
 
   req.session.loggedIn = true;

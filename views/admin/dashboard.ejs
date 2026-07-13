@@ -31,6 +31,25 @@
     </div>
 
     <div class="nl-card">
+      <h2>Stream key</h2>
+      <p style="color: var(--muted); font-size: 0.85rem;">
+        Put this in your broadcast software's ingest URL — it's what OME's
+        admission webhook checks incoming publishes against.
+      </p>
+      <div class="nl-field">
+        <label class="nl-label">RTMP</label>
+        <input class="nl-input" type="text" readonly value="rtmp://YOUR-OME-HOST/app/live?jwt=<%= settings.streamKey %>" onclick="this.select()" />
+      </div>
+      <div class="nl-field">
+        <label class="nl-label">SRT</label>
+        <input class="nl-input" type="text" readonly value="srt://YOUR-OME-HOST:9999?streamid=publish:app/live:<%= settings.streamKey %>" onclick="this.select()" />
+      </div>
+      <form method="POST" action="/admin/stream-key/regenerate" onsubmit="return confirm('This invalidates the current key immediately — anything still streaming with it will be cut off. Continue?');">
+        <button class="nl-btn danger" type="submit">Regenerate stream key</button>
+      </form>
+    </div>
+
+    <div class="nl-card">
       <h2>Your account</h2>
       <% if (messages.account) { %><div class="nl-error"><%= messages.account %></div><% } %>
       <form method="POST" action="/admin/account">

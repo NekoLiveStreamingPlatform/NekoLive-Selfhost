@@ -123,19 +123,36 @@ Key pieces this app depends on:
 
 Copy `config/config.example.json` to `config/config.json` and fill in:
 
-- `ome.apiUrl` — `http://YOUR-OME-HOST:8081/`
+- `sessionSecret` — a long random string (e.g. `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`)
+- `ome.apiUrl` — OME's Manager API. This is only ever called
+  **server-to-server** (this app -> OME), never by a viewer's browser, so if
+  you're running both via `docker-compose.yml` (see below) this can be the
+  internal service hostname, e.g. `http://ome:8081/` — no need to expose
+  port 8081 publicly.
 - `ome.apiAccessToken` — the same token you put in `Server.xml`'s
-  `Managers/API/AccessToken`
-- `ome.playerurl` — `http://YOUR-OME-HOST:8080/` (LLHLS)
-- `ome.webrtcurl` — `http://YOUR-OME-HOST:3334/` (WebRTC/WHEP playback)
+  `Managers/API/AccessToken` (generate one with the same command as
+  `sessionSecret` above)
+- `ome.playerurl` (LLHLS) / `ome.webrtcurl` (WebRTC/WHEP) — unlike `apiUrl`,
+  these get sent to **viewers' browsers** to fetch/connect to directly, so
+  they must be a publicly/LAN-reachable host:port — the internal compose
+  hostname won't work here. Match whatever ports `Server.xml`'s
+  `Bind/Publishers` section actually uses (this repo's `ome/Server.xml`
+  uses 8080 for LLHLS and 3333 for WebRTC — note plain 3333, not the TLS
+  variant 3334, until you've configured a cert).
 - `ome.streamName` — whatever stream name you'll publish under, e.g. `live`
-  (so your RTMP URL becomes `rtmp://YOUR-OME-HOST/app/live`)
-- `ome.streamKey` — a long random secret **you choose** — this app checks
-  incoming publishes against it (via a `?jwt=` query param on the RTMP/WHIP
-  URL, or as the SRT streamid), so put your broadcaster software's stream
-  key/URL as:
-  - RTMP: `rtmp://YOUR-OME-HOST/app/live?jwt=YOUR-STREAM-KEY`
-  - SRT: `srt://YOUR-OME-HOST:9999?streamid=publish:app/live:YOUR-STREAM-KEY`
+
+**Your stream key is no longer set here** — it's generated automatically the
+first time you run `/setup`, and shown (with a regenerate button) on the
+admin dashboard, along with ready-to-copy RTMP/SRT ingest URLs.
+
+If you're running OME via this repo's own `ome/Server.xml` +
+`docker-compose.yml` (rather than the generic single-container example
+above), the `AccessToken` there and `config.json`'s `ome.apiAccessToken`
+must be the exact same value, and `Server.xml`'s
+`AdmissionWebhooks/ControlServerUrl` must use the app's compose service
+name (`http://nekolive-selfhost:8090/api/admission/ome`), not `127.0.0.1` —
+from inside the `ome` container, `127.0.0.1` means OME's own localhost, not
+the app's.
 
 ## 4. First run
 
@@ -143,11 +160,13 @@ Copy `config/config.example.json` to `config/config.json` and fill in:
 npm install
 node app.js
 ```
+(or `docker compose up -d --build` if using the compose setup above)
 
 Visit the app's URL — you'll be redirected to `/setup` to create your admin
-account and channel name (this only ever happens once; no default credential
-ships with this app). Then start streaming with the URL/key from step 3 —
-the channel page should show LIVE within ~20 seconds.
+account, channel name, and stream key (this only ever happens once; no
+default credential ships with this app). Grab the ingest URL from the admin
+dashboard and start streaming — the channel page should show LIVE within
+~20 seconds.
 
 ## Caveats
 

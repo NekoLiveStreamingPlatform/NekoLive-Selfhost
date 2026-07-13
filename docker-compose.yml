@@ -27,5 +27,9 @@ services:
       - 3478:3478/tcp
       - 10000-10004:10000-10004/udp
       - 127.0.0.1:8081:8081/tcp
+      # LLHLS playback (Server.xml's Bind/Publishers/LLHLS port) — viewers'
+      # browsers fetch this directly, so it needs to be published, unlike
+      # 8081 (the Manager API, only ever called container-to-container).
+      - 8080:8080/tcp
     volumes:
       - ./ome/Server.xml:/opt/ovenmediaengine/bin/origin_conf/Server.xml

@@ -13,16 +13,19 @@
   only ever requests LLHLS/WebRTC — see utils/mediaNodes.js's
   resolveOmePlaybackUrls).
 
-  Integration points with NekoLive:
-    - AdmissionWebhooks/ControlServerUrl -> routes/api/omeAdmission.js
-      (stream-key auth, mirrors MediaMTX's authHTTPAddress)
+  Integration points with this app (NekoLiveSelfHost, not the main NekoLive
+  site — this file was adapted from that repo's own OME config):
+    - AdmissionWebhooks/ControlServerUrl -> routes/api/admission.js
+      (stream-key auth against the DB-stored Settings.streamKey, shown/
+      regenerated from the admin dashboard, not config.json)
     - Bind/Managers/API/Port + top-level Managers/API/AccessToken ->
-      NodeServer.apiUrl/apiAccessToken (models/NodeServer.js), used by
-      utils/mediaNodes.js for live-status checks and by
-      services/pushPublishService.js for Push Publishing. Push Publishing
-      itself has no static per-Application XML flag in this schema — it's
-      started/stopped purely via the REST API's :startPush/:stopPush per
-      stream, so nothing extra is needed here for it to work.
+      config/config.json's ome.apiUrl/ome.apiAccessToken, used by
+      services/omeClient.js for live-status checks and by
+      services/pushRelay.js for the relay-to-NekoLive Push Publishing
+      feature. Push Publishing itself has no static per-Application XML
+      flag in this schema — it's started/stopped purely via the REST API's
+      :startPush/:stopPush per stream, so nothing extra is needed here for
+      it to work.
 -->
 <Server version="8">
 	<Name>NekoLiveSelfHost-OME</Name>
@@ -149,10 +152,8 @@
 			</Names>
 		</Host>
 		<API>
-			<!-- Same value goes into NodeServer.apiAccessToken in the admin UI.
-			     Generate a fresh, unique token per backend — don't reuse this
-			     one across ome-na/ome-eu/etc. -->
-			<AccessToken>CHANGE_ME_TO_A_LONG_RANDOM_TOKEN</AccessToken>
+			<!-- Same value goes into config/config.json's ome.apiAccessToken. -->
+			<AccessToken>59e684b28d1c871203ad8414302cd128951986ea7c8772e7d6fcea555b7d5ca8</AccessToken>
 			<CrossDomains>
 				<Url>*</Url>
 			</CrossDomains>
@@ -197,7 +198,11 @@
 			     which over-counts since LLHLS here runs over HTTP/1.1 (one
 			     viewer can hold several concurrent connections open). -->
 			<AdmissionWebhooks>
-				<ControlServerUrl>http://127.0.0.1:8090/api/admission/ome</ControlServerUrl>
+				<!-- "nekolive-selfhost" is the app's docker-compose service
+				     name — from inside the ome container, 127.0.0.1 would be
+				     OME's OWN localhost, not the app's, so this must use the
+				     compose network's internal DNS instead. -->
+				<ControlServerUrl>http://nekolive-selfhost:8090/api/admission/ome</ControlServerUrl>
 				<SecretKey></SecretKey>
 				<Timeout>3000</Timeout>
 				<Enables>

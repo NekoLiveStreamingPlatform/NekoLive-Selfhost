@@ -5,10 +5,9 @@
   "ome": {
     "apiUrl": "http://127.0.0.1:8081/",
     "apiAccessToken": "your-ome-access-token",
-    "playerurl": "http://127.0.0.1:8080/",
-    "webrtcurl": "http://127.0.0.1:3334/",
+    "playerurl": "http://YOUR-PUBLIC-OR-LAN-IP:8080/",
+    "webrtcurl": "http://YOUR-PUBLIC-OR-LAN-IP:3333/",
     "appName": "app",
-    "streamName": "live",
-    "streamKey": "change-this-to-a-long-random-secret"
+    "streamName": "live"
   }
 }

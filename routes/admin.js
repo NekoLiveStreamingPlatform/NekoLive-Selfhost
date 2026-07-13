@@ -1,5 +1,6 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 const { ensureAuthenticated } = require("../middleware/auth");
 const Settings = require("../models/Settings");
 const BannedConnection = require("../models/BannedConnection");
@@ -84,6 +85,16 @@ router.post("/ban", async (req, res) => {
 
 router.post("/ban/:id/remove", async (req, res) => {
   await BannedConnection.destroy({ where: { id: req.params.id } });
+  res.redirect("/admin");
+});
+
+// Regenerating invalidates the old key immediately — anyone still trying to
+// publish with it (including the owner's own already-configured broadcast
+// software) will start getting denied by the admission webhook right away.
+router.post("/stream-key/regenerate", async (req, res) => {
+  const settings = await Settings.findByPk(1);
+  settings.streamKey = crypto.randomBytes(24).toString("hex");
+  await settings.save();
   res.redirect("/admin");
 });
 

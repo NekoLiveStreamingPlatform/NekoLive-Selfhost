@@ -14,6 +14,11 @@ Settings.init(
     ownerUsername: { type: DataTypes.STRING, allowNull: false },
     ownerEmail: { type: DataTypes.STRING, allowNull: false },
     passwordHash: { type: DataTypes.STRING, allowNull: false },
+    // Generated on /setup, shown (and regeneratable) from the admin
+    // dashboard — not something the owner hand-edits into config.json. This
+    // is what OME's admission webhook checks incoming publishes against
+    // (routes/api/admission.js), via a `?jwt=` query param on the ingest URL.
+    streamKey: { type: DataTypes.STRING, allowNull: false },
     relayEnabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     relayRtmpUrl: { type: DataTypes.STRING, allowNull: true },
     relayStreamKey: { type: DataTypes.STRING, allowNull: true },

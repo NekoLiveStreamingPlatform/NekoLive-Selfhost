@@ -2,6 +2,7 @@ const express = require("express");
 const { loadConfig } = require("../../config/loader");
 const viewerSessions = require("../../services/viewerSessions");
 const BannedConnection = require("../../models/BannedConnection");
+const Settings = require("../../models/Settings");
 
 const router = express.Router();
 
@@ -66,8 +67,10 @@ router.post("/", async (req, res) => {
       rawKey = url;
     }
 
-    const config = loadConfig();
-    const expectedKey = config.ome.streamKey;
+    // Generated on /setup and shown/regeneratable from the admin dashboard
+    // (routes/admin.js) — not a value typed into config.json.
+    const settings = await Settings.findByPk(1);
+    const expectedKey = settings?.streamKey;
     const providedKey = String(rawKey || "").split(":").pop();
     return res.json({ allowed: !!expectedKey && providedKey === expectedKey });
   } catch (error) {
