@@ -73,30 +73,43 @@
       </form>
     </div>
 
-    <div class="nl-card">
-      <h2>Relay to NekoLive</h2>
+    <div class="nl-card full">
+      <h2>Multistream</h2>
       <p style="color: var(--muted); font-size: 0.85rem;">
-        Simulcasts this stream to your own NekoLive channel via your local OME
-        node's Push Publishing — no re-encoding, starts/stops automatically
-        whenever you go live or offline here.
+        Simulcasts this stream to any number of destinations (your own
+        NekoLive channel, Twitch, YouTube, Kick, custom RTMP/SRT...) via
+        your local OME node's Push Publishing — no re-encoding. Toggling a
+        destination on/off here takes effect immediately, even mid-stream —
+        it doesn't wait for you to go live/offline.
       </p>
-      <% if (messages.relay) { %><div class="nl-error"><%= messages.relay %></div><% } %>
-      <form method="POST" action="/admin/relay">
+      <div id="ms-error" class="nl-error" style="display:none;"></div>
+      <table class="nl-table" style="margin-bottom: 1rem;">
+        <thead><tr><th>Destination</th><th>Protocol</th><th>Status</th><th></th><th></th></tr></thead>
+        <tbody id="ms-list"></tbody>
+      </table>
+
+      <form id="ms-add-form">
         <div class="nl-field">
-          <label class="nl-label">
-            <input type="checkbox" name="relayEnabled" <%= settings.relayEnabled ? 'checked' : '' %> />
-            Enable relay to NekoLive
-          </label>
+          <label class="nl-label">Label</label>
+          <input class="nl-input" id="ms-label" type="text" maxlength="60" placeholder="e.g. NekoLive, Twitch" required />
         </div>
         <div class="nl-field">
-          <label class="nl-label">NekoLive RTMP ingest URL</label>
-          <input class="nl-input" type="text" name="relayRtmpUrl" value="<%= settings.relayRtmpUrl || '' %>" placeholder="rtmp://ingest.nekolive.co.uk/app/" />
+          <label class="nl-label">Protocol</label>
+          <select class="nl-input" id="ms-protocol">
+            <option value="rtmp">RTMP</option>
+            <option value="srt">SRT</option>
+            <option value="mpegts">MPEG-TS</option>
+          </select>
         </div>
         <div class="nl-field">
-          <label class="nl-label">Your NekoLive stream key</label>
-          <input class="nl-input" type="password" name="relayStreamKey" value="<%= settings.relayStreamKey || '' %>" />
+          <label class="nl-label">Ingest URL</label>
+          <input class="nl-input" id="ms-url" type="text" placeholder="rtmp://ingest.example.com/app/" required />
         </div>
-        <button class="nl-btn" type="submit">Save relay settings</button>
+        <div class="nl-field">
+          <label class="nl-label">Stream key (optional, some protocols embed it in the URL instead)</label>
+          <input class="nl-input" id="ms-key" type="password" />
+        </div>
+        <button class="nl-btn" type="submit">Add destination</button>
       </form>
     </div>
 
@@ -141,5 +154,6 @@
       </table>
     </div>
   </div>
+  <script src="/js/admin.js"></script>
 </body>
 </html>

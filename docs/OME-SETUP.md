@@ -40,8 +40,8 @@ Key pieces this app depends on:
   the same values into this app's `config/config.json` under `ome.apiUrl` /
   `ome.apiAccessToken`.
 - **`<Push>` publisher** — needs no static config beyond being enabled; the
-  relay-to-NekoLive feature starts/stops it purely via OME's REST API
-  (`:startPush`/`:stopPush`), the same way NekoLive's own
+  Multistream feature (dashboard) starts/stops each destination purely via
+  OME's REST API (`:startPush`/`:stopPush`), the same way NekoLive's own
   `services/pushPublishService.js` does.
 
 ```xml
@@ -176,5 +176,6 @@ dashboard and start streaming — the channel page should show LIVE within
   working there), but this exact `Server.xml` example hasn't been tested
   end-to-end — treat it as a starting point and be ready to diff it against
   your OME version's own reference config if it fails to start.
-- **Relay to NekoLive** requires your own real NekoLive channel + stream key
+- **Multistreaming to NekoLive** (as one of your destinations) requires your
+  own real NekoLive channel + stream key
   — get that from your NekoLive account's dashboard first.

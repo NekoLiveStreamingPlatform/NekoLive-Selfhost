@@ -8,8 +8,10 @@ OvenMediaEngine (OME) and using the same WHEP/LLHLS player as NekoLive.
 - Admin can ban an IP from the dashboard, which blocks both chat and
   playback in one action, without the banned person ever needing to sign up
   for anything.
-- Optional one-click relay: simulcast this stream to your own NekoLive
-  channel via OME's native Push Publishing.
+- Multistream: simulcast this stream to any number of destinations (your
+  own NekoLive channel, Twitch, YouTube, Kick, custom RTMP/SRT...) via
+  OME's native Push Publishing, each toggleable on/off in real time from
+  the dashboard — even mid-stream.
 
 ## Quick start
 
@@ -53,10 +55,10 @@ can compile from source instead of using a prebuilt binary.
   `BannedConnection`)
 - `routes/` — pages (`index.js`), admin dashboard (`admin.js`), APIs
   (`api/admission.js` for OME's webhook, `api/stream.js` for the channel
-  page's status polling)
+  page's status polling, `api/multistream.js` for multistream targets)
 - `services/` — `omeClient.js` (OME REST calls), `liveDetection.js` (poll
-  loop), `pushRelay.js` (relay to NekoLive), `viewerSessions.js` (viewer
-  counting)
+  loop), `multistream.js` (start/stop/sync push-publish targets),
+  `viewerSessions.js` (viewer counting)
 - `chat/chatServer.js` — anonymous single-room WebSocket chat
 - `views/` — EJS templates + `views/js/nl-whep-player.js` (the player,
   shared with NekoLive) + `views/js/channel.js` (client logic)

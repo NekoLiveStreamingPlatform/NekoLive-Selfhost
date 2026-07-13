@@ -108,12 +108,18 @@
       } catch (_) {
         return;
       }
-      if (data.type === "chat_message") appendChatMessage(data.displayName, data.message);
+      if (data.type === "joined") appendSystemMessage("Connected to chat.");
+      else if (data.type === "chat_message") appendChatMessage(data.displayName, data.message);
       else if (data.type === "viewer_count") viewerCountEl.textContent = `${data.count} watching`;
       else if (data.type === "banned") appendSystemMessage("You have been banned.");
     };
     ws.onclose = () => {
       clearInterval(pingTimer);
+      // Visible instead of a silently empty chat box — if this keeps
+      // reappearing every few seconds, the WebSocket upgrade for /ws/chat
+      // isn't reaching this app at all (commonly a reverse proxy in front
+      // of it not forwarding the Upgrade/Connection headers for that path).
+      appendSystemMessage("Chat disconnected — reconnecting...");
       setTimeout(connectChat, 3000);
     };
     ws.onerror = () => {};

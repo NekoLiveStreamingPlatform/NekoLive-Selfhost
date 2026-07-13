@@ -10,6 +10,7 @@ const indexRouter = require("./routes/index");
 const adminRouter = require("./routes/admin");
 const admissionRouter = require("./routes/api/admission");
 const streamRouter = require("./routes/api/stream");
+const multistreamRouter = require("./routes/api/multistream");
 const chatServer = require("./chat/chatServer");
 const liveDetection = require("./services/liveDetection");
 
@@ -44,6 +45,7 @@ app.use("/api/admission/ome", admissionRouter);
 app.use(requireSetupComplete);
 
 app.use("/api/stream", streamRouter);
+app.use("/api/multistream", multistreamRouter);
 app.use("/admin", adminRouter);
 app.use("/", indexRouter);
 

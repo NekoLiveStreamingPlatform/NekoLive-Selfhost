@@ -17,7 +17,7 @@ router.get("/", async (req, res) => {
     pageTitle: "Admin Dashboard",
     settings,
     bans,
-    messages: { channel: null, account: null, relay: null, ban: null }
+    messages: { channel: null, account: null, ban: null }
   });
 });
 
@@ -41,7 +41,7 @@ router.post("/account", async (req, res) => {
       pageTitle: "Admin Dashboard",
       settings,
       bans,
-      messages: { channel: null, account: "Current password is incorrect.", relay: null, ban: null }
+      messages: { channel: null, account: "Current password is incorrect.", ban: null }
     });
   }
 
@@ -54,20 +54,11 @@ router.post("/account", async (req, res) => {
         pageTitle: "Admin Dashboard",
         settings,
         bans,
-        messages: { channel: null, account: "New password must be at least 8 characters.", relay: null, ban: null }
+        messages: { channel: null, account: "New password must be at least 8 characters.", ban: null }
       });
     }
     settings.passwordHash = await bcrypt.hash(String(newPassword), BCRYPT_ROUNDS);
   }
-  await settings.save();
-  res.redirect("/admin");
-});
-
-router.post("/relay", async (req, res) => {
-  const settings = await Settings.findByPk(1);
-  settings.relayEnabled = req.body.relayEnabled === "on";
-  settings.relayRtmpUrl = String(req.body.relayRtmpUrl || "").trim();
-  settings.relayStreamKey = String(req.body.relayStreamKey || "").trim();
   await settings.save();
   res.redirect("/admin");
 });

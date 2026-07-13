@@ -117,7 +117,11 @@ function start(server) {
   wss = new WebSocket.Server({ noServer: true });
 
   server.on("upgrade", (req, socket, head) => {
-    if (req.url !== "/ws/chat") return;
+    // Compare only the path, not the full req.url — some reverse proxies
+    // append a query string to the upgrade request, which would otherwise
+    // fail this exact-match check and silently drop the connection.
+    const requestPath = req.url.split("?")[0];
+    if (requestPath !== "/ws/chat") return;
     wss.handleUpgrade(req, socket, head, async (ws) => {
       const ip = clientIp(req);
       if (await isBanned(ip)) {

@@ -14,6 +14,9 @@
 
 body {
   margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: var(--bg);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -96,14 +99,28 @@ a:hover { color: var(--accent-hover); }
 }
 
 .nl-channel-layout {
+  flex: 1;
+  min-height: 0;
   display: flex;
   gap: 1rem;
   padding: 1rem;
-  height: calc(100vh - 60px);
 }
-.nl-video-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.75rem; }
-.nl-video-frame { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: var(--radius); overflow: hidden; }
-.nl-video-frame video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+.nl-video-col { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+/* flex:1 lets this take whatever space is actually available instead of a
+   fixed aspect-ratio box computed purely from width — on a wide-but-short
+   window, an aspect-ratio box sized only from width can end up taller than
+   the viewport and overflow/misalign. object-fit:contain on the video
+   itself still preserves the real video's aspect ratio (letterboxed) once
+   content loads. */
+.nl-video-frame { position: relative; flex: 1; min-height: 0; background: #000; border-radius: var(--radius); overflow: hidden; }
+.nl-video-frame video {
+  display: block; /* video defaults to inline, which leaves a small gap
+                      below it due to line-height/baseline alignment */
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
 .nl-offline-overlay {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   color: var(--muted); font-size: 1rem; background: #05050a;
@@ -112,6 +129,7 @@ a:hover { color: var(--accent-hover); }
 .nl-chat-col {
   width: 320px;
   flex-shrink: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--panel);

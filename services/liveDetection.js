@@ -9,7 +9,7 @@
 // consumers of that state.
 const { loadConfig } = require("../config/loader");
 const { getOmeStreamInfo } = require("./omeClient");
-const pushRelay = require("./pushRelay");
+const multistream = require("./multistream");
 
 const POLL_INTERVAL_MS = 20_000;
 const GRACE_MS = POLL_INTERVAL_MS * 3; // ~60s of consecutive failures before going offline
@@ -44,9 +44,9 @@ async function tick() {
       if (!wasLive) state.since = now;
       if (!wasLive) {
         try {
-          await pushRelay.onLiveStateChanged(true);
+          await multistream.syncTargets(true);
         } catch (error) {
-          console.error("pushRelay start failed:", error.message);
+          console.error("multistream sync (going live) failed:", error.message);
         }
       }
       return;
@@ -60,9 +60,9 @@ async function tick() {
       state.isLive = false;
       state.since = null;
       try {
-        await pushRelay.onLiveStateChanged(false);
+        await multistream.syncTargets(false);
       } catch (error) {
-        console.error("pushRelay stop failed:", error.message);
+        console.error("multistream sync (going offline) failed:", error.message);
       }
     }
   } catch (error) {
