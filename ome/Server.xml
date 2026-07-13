@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  OvenMediaEngine config for NekoLive, merged from OvenMediaEngine's own
+  official example Server.xml onto our NekoLive-specific wiring. This
+  parser rejects ANY unrecognized element at startup, so don't add fields
+  that aren't in the official reference without testing first.
+
+  Deliberately dropped vs. the official example, since nothing in this
+  integration uses them: RTSPC/OVT pull providers (no RTSP camera ingest),
+  MPEGTS provider, RTSPPull, Schedule (no scheduled/VOD playback), OVT
+  publisher + OriginMapStore (no origin-edge federation across regions —
+  each region is an independent backend), legacy HLS publisher (our player
+  only ever requests LLHLS/WebRTC — see utils/mediaNodes.js's
+  resolveOmePlaybackUrls).
+
+  Integration points with NekoLive:
+    - AdmissionWebhooks/ControlServerUrl -> routes/api/omeAdmission.js
+      (stream-key auth, mirrors MediaMTX's authHTTPAddress)
+    - Bind/Managers/API/Port + top-level Managers/API/AccessToken ->
+      NodeServer.apiUrl/apiAccessToken (models/NodeServer.js), used by
+      utils/mediaNodes.js for live-status checks and by
+      services/pushPublishService.js for Push Publishing. Push Publishing
+      itself has no static per-Application XML flag in this schema — it's
+      started/stopped purely via the REST API's :startPush/:stopPush per
+      stream, so nothing extra is needed here for it to work.
+-->
+<Server version="8">
+	<Name>NekoLiveSelfHost-OME</Name>
+	<Type>origin</Type>
+	<IP>*</IP>
+	<PrivacyProtection>false</PrivacyProtection>
+
+	<!-- Resolves ${PublicIP} below via STUN — needed because a container
+	     behind Docker/NAT has no public IP on its own interface to
+	     advertise as a WebRTC ICE candidate. -->
+	<StunServer>stun.ovenmediaengine.com:13478</StunServer>
+
+	<Modules>
+		<!-- HTTP/2 only works on TLS ports — harmless to leave enabled even
+		     before a cert is configured; it simply won't engage on the
+		     plain-HTTP ports this deployment currently uses. -->
+		<HTTP2>
+			<Enable>true</Enable>
+		</HTTP2>
+		<LLHLS>
+			<Enable>true</Enable>
+		</LLHLS>
+		<!-- Experimental, WebRTC-only, not needed for our streamer/viewer
+		     topology — left disabled per upstream's own default. -->
+		<P2P>
+			<Enable>false</Enable>
+			<MaxClientPeersPerHostPeer>2</MaxClientPeersPerHostPeer>
+		</P2P>
+	</Modules>
+
+	<Bind>
+		<!-- REST API's listening port — enabled (upstream ships this
+		     commented out by default). Bound here under Bind, NOT under the
+		     top-level Managers block below (that one is name-matching + the
+		     access token, a separate concern in this schema). -->
+		<Managers>
+			<API>
+				<Port>8081</Port>
+				<WorkerCount>1</WorkerCount>
+			</API>
+		</Managers>
+
+		<Providers>
+			<RTMP>
+				<Port>1935</Port>
+				<WorkerCount>1</WorkerCount>
+			</RTMP>
+			<SRT>
+				<Port>9999</Port>
+				<WorkerCount>1</WorkerCount>
+			</SRT>
+			<WebRTC>
+				<Signalling>
+					<Port>3333</Port>
+					<TLSPort>3334</TLSPort>
+					<WorkerCount>1</WorkerCount>
+				</Signalling>
+				<IceCandidates>
+					<IceCandidate>${PublicIP}:10000-10004/udp</IceCandidate>
+					<!-- TURN-over-TCP relay fallback for streamers/viewers behind
+					     restrictive NATs/firewalls that block UDP outright. -->
+					<TcpRelay>${PublicIP}:3478</TcpRelay>
+					<TcpForce>false</TcpForce>
+					<TcpRelayWorkerCount>1</TcpRelayWorkerCount>
+				</IceCandidates>
+			</WebRTC>
+		</Providers>
+
+		<Publishers>
+			<LLHLS>
+				<!-- OME only supports h2, so LLHLS runs over HTTP/1.1 on the
+				     non-TLS port; it performs better over HTTP/2 once a cert is
+				     configured on the TLS port. -->
+				<Port>8080</Port>
+				<TLSPort>8443</TLSPort>
+				<WorkerCount>1</WorkerCount>
+			</LLHLS>
+			<WebRTC>
+				<Signalling>
+					<Port>3333</Port>
+					<TLSPort>3334</TLSPort>
+					<WorkerCount>1</WorkerCount>
+				</Signalling>
+				<IceCandidates>
+					<IceCandidate>${PublicIP}:10000-10004/udp</IceCandidate>
+					<TcpRelay>${PublicIP}:3478</TcpRelay>
+					<TcpForce>false</TcpForce>
+					<TcpRelayWorkerCount>1</TcpRelayWorkerCount>
+				</IceCandidates>
+			</WebRTC>
+			<!-- Live preview JPEG snapshot — see
+			     https://ovenmedialabs.com/docs/ome/thumbnail. Deliberately
+			     reuses LLHLS's port rather than opening a new one: Thumbnail
+			     and LLHLS are both plain HTTP GET publishers, so they can
+			     share a listener the same way. NOT put on the WebRTC
+			     signalling port (3333) — that's a WebSocket-based SDP
+			     exchange, a different protocol, and much less likely to
+			     coexist cleanly on the same port. NodeServer's new
+			     thumbnailUrl admin field should point at this same
+			     host:port as playerurl. -->
+			<Thumbnail>
+				<Port>8080</Port>
+				<TLSPort>8443</TLSPort>
+			</Thumbnail>
+		</Publishers>
+	</Bind>
+
+	<!-- Default CORS for all VirtualHosts unless a VirtualHost overrides it
+	     — only one VirtualHost exists today, but this covers any added
+	     later without needing its own CrossDomains block. -->
+	<Defaults>
+		<CrossDomains>
+			<Url>*</Url>
+		</CrossDomains>
+	</Defaults>
+
+	<!-- Host = name-matching for the API server itself (separate from
+	     VirtualHosts' Host block below, which is for stream traffic).
+	     API = access token + CORS, a SIBLING of Host, not nested inside it. -->
+	<Managers>
+		<Host>
+			<Names>
+				<Name>*</Name>
+			</Names>
+		</Host>
+		<API>
+			<!-- Same value goes into NodeServer.apiAccessToken in the admin UI.
+			     Generate a fresh, unique token per backend — don't reuse this
+			     one across ome-na/ome-eu/etc. -->
+			<AccessToken>CHANGE_ME_TO_A_LONG_RANDOM_TOKEN</AccessToken>
+			<CrossDomains>
+				<Url>*</Url>
+			</CrossDomains>
+		</API>
+	</Managers>
+
+	<VirtualHosts>
+		<VirtualHost>
+			<Name>default</Name>
+			<Distribution>nekolive.co.uk</Distribution>
+
+			<Host>
+				<Names>
+					<Name>*</Name>
+				</Names>
+				<!-- No cert provisioned yet — the TLSPorts above (3334/8443)
+				     will log "there is no certificate" until this is filled in
+				     and the NodeServer admin rows are switched from the plain
+				     ports (3333/8080) to these. Not required to get ingest/
+				     playback working over plain HTTP first.
+				<TLS>
+					<CertPath>./cert.crt</CertPath>
+					<KeyPath>./cert.key</KeyPath>
+					<ChainCertPath>./cert.ca-bundle</ChainCertPath>
+				</TLS>
+				-->
+			</Host>
+
+			<CrossDomains>
+				<Url>*</Url>
+			</CrossDomains>
+
+			<!-- Stream-key auth: OME calls this on every publish attempt.
+			     <Enables><Providers> scopes gating to INGEST protocols only —
+			     routes/api/omeAdmission.js always allows playback
+			     (<Publishers>) events, mirroring MediaMTX's authHTTPExclude
+			     skipping read/playback protocols there too. Publishers is
+			     enabled anyway (read-only, never denies) so NekoLive can see
+			     real per-connection client IPs for playback and build an
+			     accurate unique-viewer count (utils/viewerSessions.js) instead
+			     of relying on /v1/stats/current's raw TCP-connection count,
+			     which over-counts since LLHLS here runs over HTTP/1.1 (one
+			     viewer can hold several concurrent connections open). -->
+			<AdmissionWebhooks>
+				<ControlServerUrl>http://127.0.0.1:8090/api/admission/ome</ControlServerUrl>
+				<SecretKey></SecretKey>
+				<Timeout>3000</Timeout>
+				<Enables>
+					<Providers>rtmp,webrtc,srt</Providers>
+					<Publishers>llhls,webrtc</Publishers>
+				</Enables>
+			</AdmissionWebhooks>
+
+			<Applications>
+				<Application>
+					<Name>app</Name>
+					<Type>live</Type>
+
+					<OutputProfiles>
+						<OutputProfile>
+							<Name>bypass_stream</Name>
+							<OutputStreamName>${OriginStreamName}</OutputStreamName>
+							<Encodes>
+								<Video>
+									<Name>bypass_video</Name>
+									<Bypass>true</Bypass>
+								</Video>
+								<!-- Two audio tracks so WebRTC/WHEP playback works
+								     regardless of the ingest source's codec: WebRTC
+								     requires Opus, but RTMP sources typically carry
+								     AAC. Each bypasses (no re-encode) if the source
+								     already matches its codec, and only transcodes
+								     when it doesn't — e.g. an AAC-sourced RTMP stream
+								     gets its AAC track passed through untouched for
+								     LLHLS while a separate Opus track is generated
+								     just for WebRTC. -->
+								<Audio>
+									<Name>aac_audio</Name>
+									<Codec>aac</Codec>
+									<Bitrate>128000</Bitrate>
+									<Samplerate>48000</Samplerate>
+									<Channel>2</Channel>
+									<BypassIfMatch>
+										<Codec>eq</Codec>
+									</BypassIfMatch>
+								</Audio>
+								<Audio>
+									<Name>opus_audio</Name>
+									<Codec>opus</Codec>
+									<Bitrate>128000</Bitrate>
+									<Samplerate>48000</Samplerate>
+									<Channel>2</Channel>
+									<BypassIfMatch>
+										<Codec>eq</Codec>
+									</BypassIfMatch>
+								</Audio>
+							</Encodes>
+						</OutputProfile>
+
+						<!-- Separate profile (its own OutputStreamName, suffixed
+						     _preview) purely for the periodic JPEG snapshot the
+						     Thumbnail publisher below serves — bypass isn't
+						     supported for image encodes, so this always
+						     transcodes one frame/sec regardless of the source
+						     codec. See utils/mediaNodes.js's
+						     resolveOmeThumbnailUrl(). -->
+						<OutputProfile>
+							<Name>thumbnail_stream</Name>
+							<OutputStreamName>${OriginStreamName}_preview</OutputStreamName>
+							<Encodes>
+								<Image>
+									<Codec>jpeg</Codec>
+									<Framerate>1</Framerate>
+									<Width>1280</Width>
+									<Height>720</Height>
+								</Image>
+							</Encodes>
+						</OutputProfile>
+					</OutputProfiles>
+
+					<Providers>
+						<RTMP />
+						<SRT />
+						<WebRTC>
+							<Timeout>30000</Timeout>
+							<CrossDomains>
+								<Url>*</Url>
+							</CrossDomains>
+						</WebRTC>
+					</Providers>
+
+					<Publishers>
+						<AppWorkerCount>1</AppWorkerCount>
+						<StreamWorkerCount>8</StreamWorkerCount>
+
+						<WebRTC>
+							<Timeout>30000</Timeout>
+							<Rtx>false</Rtx>
+							<Ulpfec>false</Ulpfec>
+							<JitterBuffer>false</JitterBuffer>
+						</WebRTC>
+
+						<LLHLS>
+							<OriginMode>true</OriginMode>
+							<ChunkDuration>0.5</ChunkDuration>
+							<!-- PartHoldBack should be at least 3x ChunkDuration
+							     per the LL-HLS spec. -->
+							<PartHoldBack>1.5</PartHoldBack>
+							<SegmentDuration>6</SegmentDuration>
+							<!-- 14 x 6s = 84s rolling buffer — margin over the 60s max
+							     clip duration services/clipService.js supports, so a
+							     clip request right at the boundary doesn't come up
+							     short. -->
+							<SegmentCount>14</SegmentCount>
+							<!-- NekoLive's own player pages are served from a
+							     different origin than this playback URL — CORS is
+							     required for hls.js to fetch segments cross-origin. -->
+							<CrossDomains>
+								<Url>*</Url>
+							</CrossDomains>
+						</LLHLS>
+
+						<!-- Must be registered here too, or the REST API/OME won't
+						     actually serve it for this app even though it's bound
+						     at the Bind level above — same requirement as every
+						     other publisher on this list. -->
+						<Thumbnail>
+							<CrossDomains>
+								<Url>*</Url>
+							</CrossDomains>
+						</Thumbnail>
+
+						<!-- Required to register the Push publisher for this app at
+						     all — without it, the REST API's :startPush/:stopPush
+						     (services/pushPublishService.js) 404 with "Could not
+						     find application", even though the app itself clearly
+						     exists (every other publisher above is declared the
+						     same explicit way). StreamMap is OME's separate,
+						     optional static/file-based push-rules mechanism — not
+						     needed since NekoLive drives pushes dynamically via the
+						     REST API, so it's just disabled here. -->
+						<Push>
+							<StreamMap>
+								<Enable>false</Enable>
+							</StreamMap>
+						</Push>
+					</Publishers>
+				</Application>
+			</Applications>
+		</VirtualHost>
+	</VirtualHosts>
+</Server>

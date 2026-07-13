@@ -1,0 +1,31 @@
+services:
+  nekolive-selfhost:
+    build: .
+    ports:
+      - "8090:8090"
+    volumes:
+      # config/config.json and the SQLite file both live on the host so they
+      # survive `docker compose down`/rebuilds — neither should ever be
+      # baked into the image (see .dockerignore).
+      - ./config:/app/config
+      - ./data:/app/data
+    restart: unless-stopped
+  ome:
+    image: airensoft/ovenmediaengine:latest
+    container_name: ome
+    restart: unless-stopped
+    environment:
+      - OME_HOST_IP=IPHERE  # optional, only needed if you want to override OME's auto-detected public IP
+    expose:
+      - "1935"
+      - "9999/udp"
+    ports:
+      - 9077:9000/tcp
+      - 1935:1935/tcp
+      - 9999:9999/udp
+      - 3333:3333/tcp
+      - 3478:3478/tcp
+      - 10000-10004:10000-10004/udp
+      - 127.0.0.1:8081:8081/tcp
+    volumes:
+      - ./ome/Server.xml:/opt/ovenmediaengine/bin/origin_conf/Server.xml

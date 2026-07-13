@@ -1,0 +1,126 @@
+<%- include('../partials/header') %>
+  <div class="nl-nav">
+    <span class="brand">Admin Dashboard</span>
+    <span>
+      <a class="nl-btn secondary" href="/">View channel</a>
+      <form method="POST" action="/logout" style="display:inline;">
+        <button class="nl-btn secondary" type="submit">Log out</button>
+      </form>
+    </span>
+  </div>
+
+  <div class="nl-admin-grid">
+    <div class="nl-card">
+      <h2>Channel info</h2>
+      <% if (messages.channel) { %><div class="nl-error"><%= messages.channel %></div><% } %>
+      <form method="POST" action="/admin/channel">
+        <div class="nl-field">
+          <label class="nl-label">Channel name</label>
+          <input class="nl-input" type="text" name="channelName" value="<%= settings.channelName %>" maxlength="40" required />
+        </div>
+        <div class="nl-field">
+          <label class="nl-label">Stream title</label>
+          <input class="nl-input" type="text" name="channelTitle" value="<%= settings.channelTitle || '' %>" maxlength="140" />
+        </div>
+        <div class="nl-field">
+          <label class="nl-label">Bio</label>
+          <textarea class="nl-textarea" name="channelBio" rows="3" maxlength="500"><%= settings.channelBio || '' %></textarea>
+        </div>
+        <button class="nl-btn" type="submit">Save channel info</button>
+      </form>
+    </div>
+
+    <div class="nl-card">
+      <h2>Your account</h2>
+      <% if (messages.account) { %><div class="nl-error"><%= messages.account %></div><% } %>
+      <form method="POST" action="/admin/account">
+        <div class="nl-field">
+          <label class="nl-label">Username</label>
+          <input class="nl-input" type="text" name="username" value="<%= settings.ownerUsername %>" maxlength="40" />
+        </div>
+        <div class="nl-field">
+          <label class="nl-label">Email</label>
+          <input class="nl-input" type="email" name="email" value="<%= settings.ownerEmail %>" maxlength="120" />
+        </div>
+        <div class="nl-field">
+          <label class="nl-label">New password (leave blank to keep current)</label>
+          <input class="nl-input" type="password" name="newPassword" minlength="8" />
+        </div>
+        <div class="nl-field">
+          <label class="nl-label">Current password (required to save any change here)</label>
+          <input class="nl-input" type="password" name="currentPassword" required />
+        </div>
+        <button class="nl-btn" type="submit">Save account</button>
+      </form>
+    </div>
+
+    <div class="nl-card">
+      <h2>Relay to NekoLive</h2>
+      <p style="color: var(--muted); font-size: 0.85rem;">
+        Simulcasts this stream to your own NekoLive channel via your local OME
+        node's Push Publishing — no re-encoding, starts/stops automatically
+        whenever you go live or offline here.
+      </p>
+      <% if (messages.relay) { %><div class="nl-error"><%= messages.relay %></div><% } %>
+      <form method="POST" action="/admin/relay">
+        <div class="nl-field">
+          <label class="nl-label">
+            <input type="checkbox" name="relayEnabled" <%= settings.relayEnabled ? 'checked' : '' %> />
+            Enable relay to NekoLive
+          </label>
+        </div>
+        <div class="nl-field">
+          <label class="nl-label">NekoLive RTMP ingest URL</label>
+          <input class="nl-input" type="text" name="relayRtmpUrl" value="<%= settings.relayRtmpUrl || '' %>" placeholder="rtmp://ingest.nekolive.co.uk/app/" />
+        </div>
+        <div class="nl-field">
+          <label class="nl-label">Your NekoLive stream key</label>
+          <input class="nl-input" type="password" name="relayStreamKey" value="<%= settings.relayStreamKey || '' %>" />
+        </div>
+        <button class="nl-btn" type="submit">Save relay settings</button>
+      </form>
+    </div>
+
+    <div class="nl-card">
+      <h2>Ban list</h2>
+      <p style="color: var(--muted); font-size: 0.85rem;">
+        Blocks both chat and stream playback from this IP — they don't need
+        any account for this to work.
+      </p>
+      <% if (messages.ban) { %><div class="nl-error"><%= messages.ban %></div><% } %>
+      <form method="POST" action="/admin/ban" style="margin-bottom: 1rem;">
+        <div class="nl-field">
+          <label class="nl-label">IP address to ban</label>
+          <input class="nl-input" type="text" name="ip" placeholder="1.2.3.4" required />
+        </div>
+        <div class="nl-field">
+          <label class="nl-label">Reason (optional)</label>
+          <input class="nl-input" type="text" name="reason" maxlength="200" />
+        </div>
+        <button class="nl-btn danger" type="submit">Ban IP</button>
+      </form>
+
+      <table class="nl-table">
+        <thead><tr><th>IP</th><th>Reason</th><th>Banned</th><th></th></tr></thead>
+        <tbody>
+          <% bans.forEach(function(ban) { %>
+            <tr>
+              <td><%= ban.ip %></td>
+              <td><%= ban.reason || '' %></td>
+              <td><%= ban.createdAt.toISOString().slice(0, 10) %></td>
+              <td>
+                <form method="POST" action="/admin/ban/<%= ban.id %>/remove">
+                  <button class="nl-btn secondary" type="submit">Unban</button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+          <% if (!bans.length) { %>
+            <tr><td colspan="4" style="color: var(--muted);">No bans yet.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,19 @@
+<%- include('partials/header') %>
+  <div class="nl-auth-wrap">
+    <h1>Log in</h1>
+    <% if (error) { %><div class="nl-error"><%= error %></div><% } %>
+    <form method="POST" action="/login">
+      <div class="nl-field">
+        <label class="nl-label">Username</label>
+        <input class="nl-input" type="text" name="username" required maxlength="40" />
+      </div>
+      <div class="nl-field">
+        <label class="nl-label">Password</label>
+        <input class="nl-input" type="password" name="password" required />
+      </div>
+      <button class="nl-btn" type="submit" style="width:100%;">Log in</button>
+    </form>
+    <p style="margin-top:1rem;"><a href="/">&larr; Back to channel</a></p>
+  </div>
+</body>
+</html>

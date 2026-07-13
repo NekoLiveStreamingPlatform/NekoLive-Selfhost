@@ -1,0 +1,50 @@
+<%- include('partials/header') %>
+  <div class="nl-nav">
+    <span class="brand"><%= channelName %></span>
+    <span>
+      <% if (isLoggedIn) { %>
+        <a class="nl-btn secondary" href="/admin">Admin</a>
+        <form method="POST" action="/logout" style="display:inline;">
+          <button class="nl-btn secondary" type="submit">Log out</button>
+        </form>
+      <% } else { %>
+        <a class="nl-btn secondary" href="/login">Admin login</a>
+      <% } %>
+    </span>
+  </div>
+
+  <div class="nl-channel-layout">
+    <div class="nl-video-col">
+      <div class="nl-video-frame">
+        <video id="nl-video" autoplay playsinline muted></video>
+        <div id="nl-offline-overlay" class="nl-offline-overlay">Offline</div>
+      </div>
+      <div>
+        <span id="nl-live-badge" class="nl-offline-badge">OFFLINE</span>
+        <span id="nl-viewer-count" style="color: var(--muted); font-size: 0.85rem; margin-left: 0.5rem;">0 watching</span>
+      </div>
+      <h2 id="nl-stream-title" style="margin: 0.25rem 0;"><%= channelTitle %></h2>
+      <% if (channelBio) { %><p style="color: var(--muted);"><%= channelBio %></p><% } %>
+    </div>
+
+    <div class="nl-chat-col">
+      <div id="nl-chat-feed" class="nl-chat-feed"></div>
+      <div id="nl-chat-name-row" class="nl-chat-input-row">
+        <input id="nl-chat-name-input" class="nl-input" type="text" placeholder="Pick a display name" maxlength="24" />
+        <button id="nl-chat-name-save" class="nl-btn">Join chat</button>
+      </div>
+      <div id="nl-chat-input-row" class="nl-chat-input-row" style="display:none;">
+        <input id="nl-chat-input" class="nl-input" type="text" placeholder="Say something" maxlength="500" />
+        <button id="nl-chat-send" class="nl-btn">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.NL_ADMIN_TOKEN = <%- adminChatToken ? JSON.stringify(adminChatToken) : 'null' %>;
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
+  <script src="/js/nl-whep-player.js"></script>
+  <script src="/js/channel.js"></script>
+</body>
+</html>

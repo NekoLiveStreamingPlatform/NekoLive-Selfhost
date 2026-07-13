@@ -1,0 +1,8 @@
+node_modules
+data
+config/config.json
+.git
+.gitignore
+.env
+README.md
+docs
