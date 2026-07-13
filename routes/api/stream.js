@@ -20,7 +20,6 @@ router.get("/status", async (req, res) => {
       ok: true,
       live: live.isLive,
       title: settings?.channelTitle || "",
-      whepUrl: live.isLive ? playback.webrtc : null,
       llhlsUrl: live.isLive ? playback.llhls : null,
       viewerCount: viewerSessions.countViewers(config.ome.streamName)
     });

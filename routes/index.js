@@ -2,10 +2,6 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const Settings = require("../models/Settings");
-const { loadConfig } = require("../config/loader");
-const { resolveOmePlaybackUrls } = require("../services/omeClient");
-const liveDetection = require("../services/liveDetection");
-const viewerSessions = require("../services/viewerSessions");
 const chatServer = require("../chat/chatServer");
 
 const router = express.Router();
@@ -73,22 +69,18 @@ router.post("/logout", (req, res) => {
   req.session.destroy(() => res.redirect("/login"));
 });
 
-// The one and only channel page.
+// The one and only channel page. Live state/playback URL/viewer count are
+// deliberately NOT rendered server-side here — views/js/channel.js fetches
+// all of that fresh from /api/stream/status on load and on every poll, so
+// there's only one source of truth for it instead of two that could drift.
 router.get("/", async (req, res) => {
   const settings = await Settings.findByPk(1);
-  const config = loadConfig();
-  const live = liveDetection.getState();
-  const playback = resolveOmePlaybackUrls(config.ome, config.ome.streamName);
 
   res.render("channel", {
     pageTitle: settings?.channelName || "NekoLive Self-Host",
     channelName: settings?.channelName || "channel",
     channelTitle: settings?.channelTitle || "",
     channelBio: settings?.channelBio || "",
-    isLive: live.isLive,
-    whepUrl: playback.webrtc,
-    llhlsUrl: playback.llhls,
-    viewerCount: viewerSessions.countViewers(config.ome.streamName),
     isLoggedIn: !!req.session?.loggedIn,
     adminChatToken: req.session?.loggedIn ? chatServer.ADMIN_TOKEN : null
   });

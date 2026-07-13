@@ -15,8 +15,8 @@
 
   <div class="nl-channel-layout">
     <div class="nl-video-col">
-      <div class="nl-video-frame">
-        <video id="nl-video" autoplay playsinline muted></video>
+      <div class="nl-video-frame" id="nl-video-frame">
+        <video id="stream-video" playsinline></video>
         <div id="nl-offline-overlay" class="nl-offline-overlay">Offline</div>
       </div>
       <div>
@@ -40,11 +40,12 @@
     </div>
   </div>
 
+  <link rel="stylesheet" href="/css/nl-player.css" />
   <script>
     window.NL_ADMIN_TOKEN = <%- adminChatToken ? JSON.stringify(adminChatToken) : 'null' %>;
   </script>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
-  <script src="/js/nl-whep-player.js"></script>
+  <script src="/js/player.js"></script>
   <script src="/js/channel.js"></script>
 </body>
 </html>

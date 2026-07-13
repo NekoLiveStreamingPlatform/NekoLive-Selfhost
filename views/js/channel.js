@@ -2,7 +2,6 @@
   "use strict";
 
   const STATUS_POLL_MS = 10000;
-  const video = document.getElementById("nl-video");
   const offlineOverlay = document.getElementById("nl-offline-overlay");
   const liveBadge = document.getElementById("nl-live-badge");
   const viewerCountEl = document.getElementById("nl-viewer-count");
@@ -15,10 +14,13 @@
   const chatInput = document.getElementById("nl-chat-input");
   const chatSendBtn = document.getElementById("nl-chat-send");
 
-  let playbackHandle = null;
   let lastLiveState = null;
 
   // ---------- Video status polling ----------
+  // Playback itself (play/pause/mute/volume/quality/PiP/fullscreen/stall
+  // recovery) is entirely owned by /js/player.js — the same player used on
+  // the main NekoLive site's channel page. This just tells it when to
+  // start/stop via window.initializeMediaElementPlayer/destroyStreamPlayer.
   async function pollStatus() {
     try {
       const res = await fetch("/api/stream/status", { cache: "no-store" });
@@ -38,20 +40,15 @@
         offlineOverlay.style.display = "flex";
       }
 
-      // Only reattach playback when the live state actually changes — avoids
-      // tearing down and reconnecting a perfectly fine WHEP/HLS session on
-      // every single poll.
+      // Only start/stop when the live state actually changes — avoids
+      // tearing down and reconnecting a perfectly fine HLS session on every
+      // single poll.
       if (data.live !== lastLiveState) {
         lastLiveState = data.live;
-        if (playbackHandle) {
-          window.NLWhepPlayer.detachBestPlayback(playbackHandle);
-          playbackHandle = null;
-        }
-        if (data.live && (data.whepUrl || data.llhlsUrl)) {
-          playbackHandle = await window.NLWhepPlayer.attachBestPlayback(video, {
-            whepUrl: data.whepUrl,
-            llhlsUrl: data.llhlsUrl
-          });
+        if (data.live && data.llhlsUrl) {
+          window.initializeMediaElementPlayer(data.llhlsUrl);
+        } else {
+          window.destroyStreamPlayer();
         }
       }
     } catch (err) {

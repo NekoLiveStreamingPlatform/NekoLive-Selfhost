@@ -113,14 +113,10 @@ a:hover { color: var(--accent-hover); }
    itself still preserves the real video's aspect ratio (letterboxed) once
    content loads. */
 .nl-video-frame { position: relative; flex: 1; min-height: 0; background: #000; border-radius: var(--radius); overflow: hidden; }
-.nl-video-frame video {
-  display: block; /* video defaults to inline, which leaves a small gap
-                      below it due to line-height/baseline alignment */
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #000;
-}
+/* The video element itself (#stream-video: display/size/object-fit) and the
+   controls bar (.nl-controls etc.) are styled in nl-player.css, loaded only
+   on the channel page alongside player.js — kept separate since this
+   stylesheet is shared by every page. */
 .nl-offline-overlay {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   color: var(--muted); font-size: 1rem; background: #05050a;
