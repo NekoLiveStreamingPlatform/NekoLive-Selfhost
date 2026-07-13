@@ -1,6 +1,7 @@
 services:
   nekolive-selfhost:
-    build: .
+    image: ghcr.io/nekolivestreamingplatform/nekolive-selfhost:latest
+    container_name: nekolive-selfhost
     ports:
       - "8090:8090"
     volumes:
