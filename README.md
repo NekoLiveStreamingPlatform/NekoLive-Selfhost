@@ -73,9 +73,15 @@ GHCR:
 docker compose up -d --build
 ```
 
-`config/` and `data/` are bind-mounted (see `docker-compose.yml`) so your
-settings and SQLite database survive rebuilds/`docker compose down` —
-neither is ever baked into the image (see `.dockerignore`).
+Only `config/config.json` is bind-mounted into `/app/config`; the rest of the
+`config/` directory is application code stored in the image. This is important
+because `config/loader.js` is required during startup. Mounting the whole local
+`config/` directory over `/app/config` would hide that file and make the
+container fail with `Cannot find module './config/loader'`.
+
+`data/` is also bind-mounted so the SQLite database survives rebuilds and
+`docker compose down`. Neither the runtime config nor database is baked into
+the image.
 
 The GitHub Actions Docker workflow builds both `linux/amd64` and
 `linux/arm64` with Docker Buildx/QEMU. Pull requests build both architectures
