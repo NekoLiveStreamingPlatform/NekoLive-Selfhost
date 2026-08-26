@@ -140,6 +140,13 @@
   if (!oldSelect) return;
 
   const currentGame = String(oldSelect.value || "").trim();
+  const field = oldSelect.parentElement;
+  const existingHelp = field
+    ? Array.from(field.children).find(
+        (child) => child !== oldSelect && child.classList?.contains("nl-help")
+      )
+    : null;
+
   const picker = document.createElement("div");
   picker.id = "nl-game-picker";
   picker.dataset.gamesApi = "/admin/games/search";
@@ -196,7 +203,6 @@
   picker.appendChild(actions);
   oldSelect.replaceWith(picker);
 
-  const existingHelp = picker.parentElement?.querySelector(".nl-help");
   if (existingHelp) {
     existingHelp.textContent =
       "Type a game name and select the exact result from NekoLive. Results are searched live from nekolive.co.uk/api/games. Clearing the field saves Uncategorized.";
