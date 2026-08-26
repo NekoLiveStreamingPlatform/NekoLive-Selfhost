@@ -1,33 +1,20 @@
 // A deliberately small, from-scratch chat — NOT a port of NekoLive's
-// chat/chatServer.js (967 lines, 12 Sequelize models, roles, mod commands,
-// emotes — far too coupled to NekoLive's account system to reuse). Viewers
-// here never make any account at all: they pick a display name and chat.
-// The owner (identified via ADMIN_TOKEN, see below) gets one moderation
-// power — ban — which writes to the same BannedConnection table the OME
-// admission webhook consults, so one action blocks both chat and playback.
+// account-coupled chat server. Viewers here never need a NekoLive account:
+// they pick a local display name and chat. When federation relay is enabled,
+// messages are mirrored through the authenticated node tunnel and carry an
+// explicit SELFHOST / NEKOLIVE source label on both sides.
 const WebSocket = require("ws");
 const crypto = require("crypto");
 const BannedConnection = require("../models/BannedConnection");
 
-// Generated fresh on every process start, never persisted. The channel page
-// only ever embeds this into the HTML when the request's session is already
-// logged in (see routes/index.js + views/channel.ejs), so it never reaches
-// an anonymous viewer's browser. This sidesteps needing to unsign/parse the
-// express-session cookie from inside the raw WebSocket upgrade handshake —
-// a much smaller surface for a single-owner app than wiring up the session
-// store there.
 const ADMIN_TOKEN = crypto.randomBytes(24).toString("hex");
-
 const MAX_DISPLAY_NAME_LENGTH = 24;
 const MAX_MESSAGE_LENGTH = 500;
 
 let wss = null;
+let relaySender = null;
 const clients = new Map(); // ws -> { displayName, ip, isAdmin }
 
-// Messages are only ever inserted via textContent client-side (never
-// innerHTML), so this just keeps names sane-looking rather than guarding
-// against injection — trim, cap length, and fall back to a random guest
-// name if left blank.
 function sanitizeDisplayName(raw) {
   const cleaned = String(raw || "").trim().slice(0, MAX_DISPLAY_NAME_LENGTH);
   return cleaned || ("Guest-" + Math.floor(Math.random() * 10000));
@@ -59,6 +46,23 @@ function send(ws, payload) {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(payload));
 }
 
+function broadcastFederatedMessage(payload) {
+  const message = String(payload?.message || "").trim().slice(0, MAX_MESSAGE_LENGTH);
+  if (!message) return;
+  broadcast({
+    type: "chat_message",
+    displayName: sanitizeDisplayName(payload?.displayName || "NekoLive"),
+    message,
+    ts: Number(payload?.ts) || Date.now(),
+    source: "nekolive",
+    sourceLabel: "NEKOLIVE"
+  });
+}
+
+function setRelaySender(fn) {
+  relaySender = typeof fn === "function" ? fn : null;
+}
+
 async function handleMessage(ws, raw) {
   let data;
   try {
@@ -79,10 +83,23 @@ async function handleMessage(ws, raw) {
   }
 
   if (data.type === "chat") {
-    if (!info.displayName) return; // must join first
+    if (!info.displayName) return;
     const message = String(data.message || "").trim().slice(0, MAX_MESSAGE_LENGTH);
     if (!message) return;
-    broadcast({ type: "chat_message", displayName: info.displayName, message: message, ts: Date.now() });
+    const payload = {
+      type: "chat_message",
+      displayName: info.displayName,
+      message,
+      ts: Date.now(),
+      source: "selfhost",
+      sourceLabel: "SELFHOST"
+    };
+    broadcast(payload);
+    if (relaySender) {
+      try {
+        relaySender(payload);
+      } catch (_) {}
+    }
     return;
   }
 
@@ -117,9 +134,6 @@ function start(server) {
   wss = new WebSocket.Server({ noServer: true });
 
   server.on("upgrade", (req, socket, head) => {
-    // Compare only the path, not the full req.url — some reverse proxies
-    // append a query string to the upgrade request, which would otherwise
-    // fail this exact-match check and silently drop the connection.
     const requestPath = req.url.split("?")[0];
     if (requestPath !== "/ws/chat") return;
     wss.handleUpgrade(req, socket, head, async (ws) => {
@@ -142,6 +156,13 @@ function stop() {
   if (wss) wss.close();
   wss = null;
   clients.clear();
+  relaySender = null;
 }
 
-module.exports = { start: start, stop: stop, ADMIN_TOKEN: ADMIN_TOKEN };
+module.exports = {
+  start,
+  stop,
+  ADMIN_TOKEN,
+  setRelaySender,
+  broadcastFederatedMessage
+};
