@@ -4,20 +4,22 @@ const crypto = require("crypto");
 const { ensureAuthenticated } = require("../middleware/auth");
 const Settings = require("../models/Settings");
 const BannedConnection = require("../models/BannedConnection");
+const federationClient = require("../services/federationClient");
 
 const router = express.Router();
 const BCRYPT_ROUNDS = 12;
-
 router.use(ensureAuthenticated);
 
 router.get("/", async (req, res) => {
   const settings = await Settings.findByPk(1);
   const bans = await BannedConnection.findAll({ order: [["createdAt", "DESC"]] });
+  const federationMessage = req.session.federationMessage || null;
+  delete req.session.federationMessage;
   res.render("admin/dashboard", {
     pageTitle: "Admin Dashboard",
     settings,
     bans,
-    messages: { channel: null, account: null, ban: null }
+    messages: { channel: null, account: null, ban: null, federation: federationMessage }
   });
 });
 
@@ -27,35 +29,24 @@ router.post("/channel", async (req, res) => {
   settings.channelTitle = String(req.body.channelTitle || "").trim();
   settings.channelBio = String(req.body.channelBio || "").trim();
   await settings.save();
+  federationClient.heartbeat().catch(() => {});
   res.redirect("/admin");
 });
 
 router.post("/account", async (req, res) => {
   const settings = await Settings.findByPk(1);
   const { currentPassword, username, email, newPassword } = req.body;
-
   const currentMatches = await bcrypt.compare(String(currentPassword || ""), settings.passwordHash);
   if (!currentMatches) {
-    const bans = await BannedConnection.findAll({ order: [["createdAt", "DESC"]] });
-    return res.render("admin/dashboard", {
-      pageTitle: "Admin Dashboard",
-      settings,
-      bans,
-      messages: { channel: null, account: "Current password is incorrect.", ban: null }
-    });
+    req.session.federationMessage = "Account changes were not saved: current password is incorrect.";
+    return res.redirect("/admin");
   }
-
   if (username) settings.ownerUsername = String(username).trim();
   if (email) settings.ownerEmail = String(email).trim();
   if (newPassword) {
     if (String(newPassword).length < 8) {
-      const bans = await BannedConnection.findAll({ order: [["createdAt", "DESC"]] });
-      return res.render("admin/dashboard", {
-        pageTitle: "Admin Dashboard",
-        settings,
-        bans,
-        messages: { channel: null, account: "New password must be at least 8 characters.", ban: null }
-      });
+      req.session.federationMessage = "New password must be at least 8 characters.";
+      return res.redirect("/admin");
     }
     settings.passwordHash = await bcrypt.hash(String(newPassword), BCRYPT_ROUNDS);
   }
@@ -79,13 +70,30 @@ router.post("/ban/:id/remove", async (req, res) => {
   res.redirect("/admin");
 });
 
-// Regenerating invalidates the old key immediately — anyone still trying to
-// publish with it (including the owner's own already-configured broadcast
-// software) will start getting denied by the admission webhook right away.
 router.post("/stream-key/regenerate", async (req, res) => {
   const settings = await Settings.findByPk(1);
   settings.streamKey = crypto.randomBytes(24).toString("hex");
   await settings.save();
+  res.redirect("/admin");
+});
+
+router.post("/federation/pair", async (req, res) => {
+  try {
+    await federationClient.pair({
+      hubUrl: req.body.hubUrl,
+      publicUrl: req.body.publicUrl,
+      pairingCode: req.body.pairingCode
+    });
+    req.session.federationMessage = "Selfhost node paired with NekoLive successfully.";
+  } catch (error) {
+    req.session.federationMessage = error.message;
+  }
+  res.redirect("/admin");
+});
+
+router.post("/federation/disconnect", async (req, res) => {
+  await federationClient.disconnect();
+  req.session.federationMessage = "NekoLive federation link removed. Your local stream is unchanged.";
   res.redirect("/admin");
 });
 

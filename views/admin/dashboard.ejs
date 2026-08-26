@@ -1,159 +1,99 @@
 <%- include('../partials/header') %>
   <div class="nl-nav">
-    <span class="brand">Admin Dashboard</span>
-    <span>
+    <a class="brand" href="/">NekoLive <span>Selfhost</span></a>
+    <div class="nl-nav-actions">
       <a class="nl-btn secondary" href="/">View channel</a>
-      <form method="POST" action="/logout" style="display:inline;">
-        <button class="nl-btn secondary" type="submit">Log out</button>
-      </form>
-    </span>
-  </div>
-
-  <div class="nl-admin-grid">
-    <div class="nl-card">
-      <h2>Channel info</h2>
-      <% if (messages.channel) { %><div class="nl-error"><%= messages.channel %></div><% } %>
-      <form method="POST" action="/admin/channel">
-        <div class="nl-field">
-          <label class="nl-label">Channel name</label>
-          <input class="nl-input" type="text" name="channelName" value="<%= settings.channelName %>" maxlength="40" required />
-        </div>
-        <div class="nl-field">
-          <label class="nl-label">Stream title</label>
-          <input class="nl-input" type="text" name="channelTitle" value="<%= settings.channelTitle || '' %>" maxlength="140" />
-        </div>
-        <div class="nl-field">
-          <label class="nl-label">Bio</label>
-          <textarea class="nl-textarea" name="channelBio" rows="3" maxlength="500"><%= settings.channelBio || '' %></textarea>
-        </div>
-        <button class="nl-btn" type="submit">Save channel info</button>
-      </form>
-    </div>
-
-    <div class="nl-card">
-      <h2>Stream key</h2>
-      <p style="color: var(--muted); font-size: 0.85rem;">
-        Put this in your broadcast software's ingest URL — it's what OME's
-        admission webhook checks incoming publishes against.
-      </p>
-      <div class="nl-field">
-        <label class="nl-label">RTMP</label>
-        <input class="nl-input" type="text" readonly value="rtmp://YOUR-OME-HOST/app/live?jwt=<%= settings.streamKey %>" onclick="this.select()" />
-      </div>
-      <div class="nl-field">
-        <label class="nl-label">SRT</label>
-        <input class="nl-input" type="text" readonly value="srt://YOUR-OME-HOST:9999?streamid=publish:app/live:<%= settings.streamKey %>" onclick="this.select()" />
-      </div>
-      <form method="POST" action="/admin/stream-key/regenerate" onsubmit="return confirm('This invalidates the current key immediately — anything still streaming with it will be cut off. Continue?');">
-        <button class="nl-btn danger" type="submit">Regenerate stream key</button>
-      </form>
-    </div>
-
-    <div class="nl-card">
-      <h2>Your account</h2>
-      <% if (messages.account) { %><div class="nl-error"><%= messages.account %></div><% } %>
-      <form method="POST" action="/admin/account">
-        <div class="nl-field">
-          <label class="nl-label">Username</label>
-          <input class="nl-input" type="text" name="username" value="<%= settings.ownerUsername %>" maxlength="40" />
-        </div>
-        <div class="nl-field">
-          <label class="nl-label">Email</label>
-          <input class="nl-input" type="email" name="email" value="<%= settings.ownerEmail %>" maxlength="120" />
-        </div>
-        <div class="nl-field">
-          <label class="nl-label">New password (leave blank to keep current)</label>
-          <input class="nl-input" type="password" name="newPassword" minlength="8" />
-        </div>
-        <div class="nl-field">
-          <label class="nl-label">Current password (required to save any change here)</label>
-          <input class="nl-input" type="password" name="currentPassword" required />
-        </div>
-        <button class="nl-btn" type="submit">Save account</button>
-      </form>
-    </div>
-
-    <div class="nl-card full">
-      <h2>Multistream</h2>
-      <p style="color: var(--muted); font-size: 0.85rem;">
-        Simulcasts this stream to any number of destinations (your own
-        NekoLive channel, Twitch, YouTube, Kick, custom RTMP/SRT...) via
-        your local OME node's Push Publishing — no re-encoding. Toggling a
-        destination on/off here takes effect immediately, even mid-stream —
-        it doesn't wait for you to go live/offline.
-      </p>
-      <div id="ms-error" class="nl-error" style="display:none;"></div>
-      <table class="nl-table" style="margin-bottom: 1rem;">
-        <thead><tr><th>Destination</th><th>Protocol</th><th>Status</th><th></th><th></th></tr></thead>
-        <tbody id="ms-list"></tbody>
-      </table>
-
-      <form id="ms-add-form">
-        <div class="nl-field">
-          <label class="nl-label">Label</label>
-          <input class="nl-input" id="ms-label" type="text" maxlength="60" placeholder="e.g. NekoLive, Twitch" required />
-        </div>
-        <div class="nl-field">
-          <label class="nl-label">Protocol</label>
-          <select class="nl-input" id="ms-protocol">
-            <option value="rtmp">RTMP</option>
-            <option value="srt">SRT</option>
-            <option value="mpegts">MPEG-TS</option>
-          </select>
-        </div>
-        <div class="nl-field">
-          <label class="nl-label">Ingest URL</label>
-          <input class="nl-input" id="ms-url" type="text" placeholder="rtmp://ingest.example.com/app/" required />
-        </div>
-        <div class="nl-field">
-          <label class="nl-label">Stream key (optional, some protocols embed it in the URL instead)</label>
-          <input class="nl-input" id="ms-key" type="password" />
-        </div>
-        <button class="nl-btn" type="submit">Add destination</button>
-      </form>
-    </div>
-
-    <div class="nl-card">
-      <h2>Ban list</h2>
-      <p style="color: var(--muted); font-size: 0.85rem;">
-        Blocks both chat and stream playback from this IP — they don't need
-        any account for this to work.
-      </p>
-      <% if (messages.ban) { %><div class="nl-error"><%= messages.ban %></div><% } %>
-      <form method="POST" action="/admin/ban" style="margin-bottom: 1rem;">
-        <div class="nl-field">
-          <label class="nl-label">IP address to ban</label>
-          <input class="nl-input" type="text" name="ip" placeholder="1.2.3.4" required />
-        </div>
-        <div class="nl-field">
-          <label class="nl-label">Reason (optional)</label>
-          <input class="nl-input" type="text" name="reason" maxlength="200" />
-        </div>
-        <button class="nl-btn danger" type="submit">Ban IP</button>
-      </form>
-
-      <table class="nl-table">
-        <thead><tr><th>IP</th><th>Reason</th><th>Banned</th><th></th></tr></thead>
-        <tbody>
-          <% bans.forEach(function(ban) { %>
-            <tr>
-              <td><%= ban.ip %></td>
-              <td><%= ban.reason || '' %></td>
-              <td><%= ban.createdAt.toISOString().slice(0, 10) %></td>
-              <td>
-                <form method="POST" action="/admin/ban/<%= ban.id %>/remove">
-                  <button class="nl-btn secondary" type="submit">Unban</button>
-                </form>
-              </td>
-            </tr>
-          <% }); %>
-          <% if (!bans.length) { %>
-            <tr><td colspan="4" style="color: var(--muted);">No bans yet.</td></tr>
-          <% } %>
-        </tbody>
-      </table>
+      <form method="POST" action="/logout"><button class="nl-btn secondary" type="submit">Log out</button></form>
     </div>
   </div>
+
+  <main class="nl-shell">
+    <div class="nl-page-heading">
+      <div><p class="nl-eyebrow">CREATOR CONTROL</p><h1>Admin Dashboard</h1><p>Manage your local channel, relay node and moderation from one place.</p></div>
+      <span class="nl-status-dot">SELF-HOSTED</span>
+    </div>
+
+    <% if (messages.federation) { %><div class="nl-notice"><%= messages.federation %></div><% } %>
+
+    <div class="nl-admin-grid">
+      <section class="nl-card">
+        <h2>Channel info</h2>
+        <form method="POST" action="/admin/channel">
+          <div class="nl-field"><label class="nl-label">Channel name</label><input class="nl-input" type="text" name="channelName" value="<%= settings.channelName %>" maxlength="40" required /></div>
+          <div class="nl-field"><label class="nl-label">Stream title</label><input class="nl-input" type="text" name="channelTitle" value="<%= settings.channelTitle || '' %>" maxlength="140" /></div>
+          <div class="nl-field"><label class="nl-label">Bio</label><textarea class="nl-textarea" name="channelBio" rows="3" maxlength="500"><%= settings.channelBio || '' %></textarea></div>
+          <button class="nl-btn" type="submit">Save channel info</button>
+        </form>
+      </section>
+
+      <section class="nl-card nl-card-accent">
+        <div class="nl-card-title-row"><h2>NekoLive Relay Node</h2><span class="<%= settings.federationNodeId && !settings.federationBlocked ? 'nl-live-badge' : 'nl-offline-badge' %>"><%= settings.federationNodeId ? (settings.federationBlocked ? 'BLOCKED' : 'PAIRED') : 'LOCAL ONLY' %></span></div>
+        <p class="nl-help">Pair this Selfhost install directly to the main NekoLive platform. NekoLive receives signed channel status/playback callbacks and viewers play from this node directly — no NekoLive RTMP destination and no creator stream key are required.</p>
+        <% if (!settings.federationNodeId) { %>
+          <form method="POST" action="/admin/federation/pair">
+            <div class="nl-field"><label class="nl-label">NekoLive hub URL</label><input class="nl-input" name="hubUrl" type="url" placeholder="https://nekolive.example" required /></div>
+            <div class="nl-field"><label class="nl-label">This node's public URL</label><input class="nl-input" name="publicUrl" type="url" placeholder="https://my-node.example" required /></div>
+            <div class="nl-field"><label class="nl-label">One-time pairing code</label><input class="nl-input" name="pairingCode" autocomplete="one-time-code" required /></div>
+            <button class="nl-btn" type="submit">Pair with NekoLive</button>
+          </form>
+        <% } else { %>
+          <div class="nl-kv"><span>Node ID</span><code><%= settings.federationNodeId %></code></div>
+          <div class="nl-kv"><span>Hub</span><strong><%= settings.federationHubUrl %></strong></div>
+          <div class="nl-kv"><span>Public node</span><strong><%= settings.federationPublicUrl %></strong></div>
+          <div class="nl-kv"><span>Last callback</span><strong><%= settings.federationLastSeenAt ? settings.federationLastSeenAt.toISOString() : 'Waiting for heartbeat' %></strong></div>
+          <p class="nl-help">A central block/termination only removes this channel from NekoLive federation. Your local Selfhost stream keeps running.</p>
+          <form method="POST" action="/admin/federation/disconnect" onsubmit="return confirm('Disconnect this node from NekoLive? Your local stream will keep working.');"><button class="nl-btn danger" type="submit">Disconnect relay node</button></form>
+        <% } %>
+      </section>
+
+      <section class="nl-card">
+        <h2>Stream key</h2>
+        <p class="nl-help">This key is only for publishing into your own local OME server. It is not used by the NekoLive relay-node link.</p>
+        <div class="nl-field"><label class="nl-label">RTMP</label><input class="nl-input" type="text" readonly value="rtmp://YOUR-OME-HOST/app/live?jwt=<%= settings.streamKey %>" onclick="this.select()" /></div>
+        <div class="nl-field"><label class="nl-label">SRT</label><input class="nl-input" type="text" readonly value="srt://YOUR-OME-HOST:9999?streamid=publish:app/live:<%= settings.streamKey %>" onclick="this.select()" /></div>
+        <form method="POST" action="/admin/stream-key/regenerate" onsubmit="return confirm('This invalidates the current local ingest key immediately. Continue?');"><button class="nl-btn danger" type="submit">Regenerate stream key</button></form>
+      </section>
+
+      <section class="nl-card">
+        <h2>Your account</h2>
+        <form method="POST" action="/admin/account">
+          <div class="nl-field"><label class="nl-label">Username</label><input class="nl-input" type="text" name="username" value="<%= settings.ownerUsername %>" maxlength="40" /></div>
+          <div class="nl-field"><label class="nl-label">Email</label><input class="nl-input" type="email" name="email" value="<%= settings.ownerEmail %>" maxlength="120" /></div>
+          <div class="nl-field"><label class="nl-label">New password</label><input class="nl-input" type="password" name="newPassword" minlength="8" placeholder="Leave blank to keep current" /></div>
+          <div class="nl-field"><label class="nl-label">Current password</label><input class="nl-input" type="password" name="currentPassword" required /></div>
+          <button class="nl-btn" type="submit">Save account</button>
+        </form>
+      </section>
+
+      <section class="nl-card full">
+        <div class="nl-card-title-row"><h2>Multistream destinations</h2><span class="nl-offline-badge">OPTIONAL</span></div>
+        <p class="nl-help">Traditional RTMP/SRT push targets still work for Twitch, YouTube, Kick or custom destinations. You do not need to add NekoLive here when the Relay Node above is paired.</p>
+        <div id="ms-error" class="nl-error" style="display:none;"></div>
+        <div class="nl-table-wrap"><table class="nl-table"><thead><tr><th>Destination</th><th>Protocol</th><th>Status</th><th></th><th></th></tr></thead><tbody id="ms-list"></tbody></table></div>
+        <form id="ms-add-form" class="nl-inline-form">
+          <div class="nl-field"><label class="nl-label">Label</label><input class="nl-input" id="ms-label" type="text" maxlength="60" placeholder="Twitch, YouTube..." required /></div>
+          <div class="nl-field"><label class="nl-label">Protocol</label><select class="nl-input" id="ms-protocol"><option value="rtmp">RTMP</option><option value="srt">SRT</option><option value="mpegts">MPEG-TS</option></select></div>
+          <div class="nl-field"><label class="nl-label">Ingest URL</label><input class="nl-input" id="ms-url" type="text" placeholder="rtmp://ingest.example.com/app/" required /></div>
+          <div class="nl-field"><label class="nl-label">Stream key</label><input class="nl-input" id="ms-key" type="password" placeholder="Optional" /></div>
+          <button class="nl-btn" type="submit">Add destination</button>
+        </form>
+      </section>
+
+      <section class="nl-card full">
+        <h2>Connection blacklist</h2>
+        <p class="nl-help">Blocks chat and playback from an IP on this Selfhost instance.</p>
+        <form method="POST" action="/admin/ban" class="nl-inline-form">
+          <div class="nl-field"><label class="nl-label">IP address</label><input class="nl-input" type="text" name="ip" placeholder="1.2.3.4" required /></div>
+          <div class="nl-field"><label class="nl-label">Reason</label><input class="nl-input" type="text" name="reason" maxlength="200" placeholder="Optional" /></div>
+          <button class="nl-btn danger" type="submit">Ban IP</button>
+        </form>
+        <div class="nl-table-wrap"><table class="nl-table"><thead><tr><th>IP</th><th>Reason</th><th>Banned</th><th></th></tr></thead><tbody>
+          <% bans.forEach(function(ban) { %><tr><td><%= ban.ip %></td><td><%= ban.reason || '' %></td><td><%= ban.createdAt.toISOString().slice(0, 10) %></td><td><form method="POST" action="/admin/ban/<%= ban.id %>/remove"><button class="nl-btn secondary" type="submit">Unban</button></form></td></tr><% }); %>
+          <% if (!bans.length) { %><tr><td colspan="4" class="nl-muted">No bans yet.</td></tr><% } %>
+        </tbody></table></div>
+      </section>
+    </div>
+  </main>
   <script src="/js/admin.js"></script>
 </body>
 </html>

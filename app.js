@@ -11,8 +11,10 @@ const adminRouter = require("./routes/admin");
 const admissionRouter = require("./routes/api/admission");
 const streamRouter = require("./routes/api/stream");
 const multistreamRouter = require("./routes/api/multistream");
+const federationRouter = require("./routes/api/federation");
 const chatServer = require("./chat/chatServer");
 const liveDetection = require("./services/liveDetection");
+const federationClient = require("./services/federationClient");
 
 const config = loadConfig();
 
@@ -24,9 +26,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use("/js", express.static(path.join(__dirname, "views", "js")));
 app.use("/css", express.static(path.join(__dirname, "views", "css")));
+app.use("/assets", express.static(path.join(__dirname, "views", "assets")));
 
-// In-memory session store — fine for a single small self-hosted process
-// with one admin account; no need for Redis/DB-backed sessions here.
 app.use(
   session({
     secret: config.sessionSecret,
@@ -37,15 +38,12 @@ app.use(
   })
 );
 
-// The OME admission webhook is called by OME itself, not a browser — it
-// must never redirect to /setup or /login, so it's mounted before that
-// gate.
 app.use("/api/admission/ome", admissionRouter);
-
 app.use(requireSetupComplete);
 
 app.use("/api/stream", streamRouter);
 app.use("/api/multistream", multistreamRouter);
+app.use("/api/federation", federationRouter);
 app.use("/admin", adminRouter);
 app.use("/", indexRouter);
 
@@ -55,9 +53,10 @@ const server = http.createServer(app);
 chatServer.start(server);
 
 sequelize
-  .sync()
+  .sync({ alter: true })
   .then(() => {
     liveDetection.start();
+    federationClient.start();
     server.listen(config.port, () => {
       console.log(`NekoLive Self-Host listening on ${config.siteUrl || `http://localhost:${config.port}`}`);
     });
@@ -68,6 +67,7 @@ sequelize
   });
 
 process.on("SIGINT", () => {
+  federationClient.stop();
   liveDetection.stop();
   chatServer.stop();
   server.close(() => process.exit(0));

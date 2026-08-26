@@ -12,10 +12,40 @@ OvenMediaEngine (OME) and using the same WHEP/LLHLS player as NekoLive.
   own NekoLive channel, Twitch, YouTube, Kick, custom RTMP/SRT...) via
   OME's native Push Publishing, each toggleable on/off in real time from
   the dashboard — even mid-stream.
+- Optional NekoLive Relay Node federation lets a Selfhost instance appear on
+  the main NekoLive platform without sharing the creator's local stream key.
+
+## Supported Docker architectures
+
+The GHCR image is built as a multi-architecture image for:
+
+- `linux/amd64` — normal Intel/AMD x86-64 servers and PCs.
+- `linux/arm64` — ARM64 servers and Raspberry Pi 4/5 running a 64-bit OS.
+
+Docker automatically selects the correct architecture from the same image tag:
+
+```bash
+docker pull ghcr.io/nekolivestreamingplatform/nekolive-selfhost:latest
+```
+
+No ARM-specific tag is required. `docker compose pull` and
+`docker compose up -d` also select the correct image automatically.
+
+The included `airensoft/ovenmediaengine:latest` Compose dependency is also
+multi-architecture, so the full Compose stack can run on ARM64 hosts.
+
+To build only the ARM64 Selfhost image locally with Buildx:
+
+```bash
+docker buildx build \
+  --platform linux/arm64 \
+  -t nekolive-selfhost:arm64 \
+  --load .
+```
 
 ## Quick start
 
-```
+```bash
 npm install
 cp config/config.example.json config/config.json   # then edit it
 node app.js
@@ -29,24 +59,34 @@ OvenMediaEngine side (Server.xml, admission webhook, Push Publishing).
 
 ## Quick start (Docker)
 
-```
+```bash
 cp config/config.example.json config/config.json   # then edit it
 mkdir -p data
+docker compose pull
+docker compose up -d
+```
+
+If you want to build the Selfhost application image locally instead of using
+GHCR:
+
+```bash
 docker compose up -d --build
 ```
 
 `config/` and `data/` are bind-mounted (see `docker-compose.yml`) so your
 settings and SQLite database survive rebuilds/`docker compose down` —
-neither is ever baked into the image (see `.dockerignore`). This container
-only runs the app itself; OvenMediaEngine still needs to run separately (see
-`docs/OME-SETUP.md`), whether that's its own container, another host on your
-network, or a public OME instance.
+neither is ever baked into the image (see `.dockerignore`).
 
-**Not build-tested** — this `Dockerfile`/`docker-compose.yml` were written
-but couldn't be verified in this environment (no Docker available here). If
-`npm install` fails on the `sqlite3` native module inside the container,
-either switch the base image or add build tools (`python3 make g++`) so it
-can compile from source instead of using a prebuilt binary.
+The GitHub Actions Docker workflow builds both `linux/amd64` and
+`linux/arm64` with Docker Buildx/QEMU. Pull requests build both architectures
+without publishing; pushes to `main`, version tags, and manual publish runs
+push the multi-architecture manifest to GHCR.
+
+The Dockerfile uses Debian/glibc rather than Alpine to retain broad native
+module compatibility for `sqlite3`. If a future `sqlite3` release stops
+shipping a suitable prebuilt binary for one of the supported architectures,
+the fallback is to add `python3`, `make`, and `g++` to the build stage and
+compile it from source.
 
 ## Project layout
 
@@ -55,10 +95,12 @@ can compile from source instead of using a prebuilt binary.
   `BannedConnection`)
 - `routes/` — pages (`index.js`), admin dashboard (`admin.js`), APIs
   (`api/admission.js` for OME's webhook, `api/stream.js` for the channel
-  page's status polling, `api/multistream.js` for multistream targets)
+  page's status polling, `api/multistream.js` for multistream targets,
+  `api/federation.js` for NekoLive Relay Node control messages)
 - `services/` — `omeClient.js` (OME REST calls), `liveDetection.js` (poll
   loop), `multistream.js` (start/stop/sync push-publish targets),
+  `federationClient.js` (NekoLive Relay Node pairing/heartbeats),
   `viewerSessions.js` (viewer counting)
 - `chat/chatServer.js` — anonymous single-room WebSocket chat
-- `views/` — EJS templates + `views/js/nl-whep-player.js` (the player,
-  shared with NekoLive) + `views/js/channel.js` (client logic)
+- `views/` — EJS templates plus the NekoLive-compatible channel player and
+  client-side channel/admin logic
