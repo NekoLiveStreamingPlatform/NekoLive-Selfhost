@@ -11,12 +11,15 @@ const viewerSessions = require("./viewerSessions");
 const HEARTBEAT_MS = 15_000;
 const TUNNEL_RECONNECT_MS = 5_000;
 const MAX_PROXY_BODY = 12 * 1024 * 1024;
+const BINARY_PROXY_MAGIC = Buffer.from("NLP1");
+const BINARY_PROXY_HEADER_MAX = 64 * 1024;
 let heartbeatTimer = null;
 let heartbeatInFlight = false;
 let tunnelSocket = null;
 let tunnelReconnectTimer = null;
 let stopping = false;
 let chatInjector = null;
+let tunnelCapabilities = { proxyBinaryV1: false };
 
 function normalizeBaseUrl(value) {
   return String(value || "").trim().replace(/\/+$/, "");
@@ -179,6 +182,7 @@ async function registerGuest({ hubUrl }) {
 function closeTunnel() {
   if (tunnelReconnectTimer) clearTimeout(tunnelReconnectTimer);
   tunnelReconnectTimer = null;
+  tunnelCapabilities = { proxyBinaryV1: false };
   const ws = tunnelSocket;
   tunnelSocket = null;
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
@@ -227,26 +231,68 @@ function normalizeLlhlsManifestForRelay(body, base) {
   return Buffer.from(text);
 }
 
+function encodeBinaryProxyResponse(requestId, payload) {
+  const body = Buffer.isBuffer(payload.body) ? payload.body : Buffer.from(payload.body || Buffer.alloc(0));
+  const metadata = Buffer.from(JSON.stringify({
+    type: "proxy_response_binary",
+    requestId,
+    status: payload.status,
+    headers: payload.headers || {},
+    upstreamBase: payload.upstreamBase || ""
+  }));
+  if (metadata.length > BINARY_PROXY_HEADER_MAX) throw new Error("Relay response metadata exceeded limit");
+
+  const frame = Buffer.allocUnsafe(8 + metadata.length + body.length);
+  BINARY_PROXY_MAGIC.copy(frame, 0);
+  frame.writeUInt32BE(metadata.length, 4);
+  metadata.copy(frame, 8);
+  body.copy(frame, 8 + metadata.length);
+  return frame;
+}
+
+function sendProxyResponse(ws, requestId, payload) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  const body = Buffer.isBuffer(payload.body) ? payload.body : Buffer.from(payload.body || Buffer.alloc(0));
+
+  // New WEBLIVE hubs advertise binary proxy v1. Binary avoids the ~33%
+  // base64 expansion plus JSON stringify/parse work for every LL-HLS part.
+  // Keep the original JSON format as a compatibility fallback for old hubs.
+  if (tunnelCapabilities.proxyBinaryV1) {
+    try {
+      const frame = encodeBinaryProxyResponse(requestId, { ...payload, body });
+      ws.send(frame, { binary: true });
+      return;
+    } catch (error) {
+      console.warn("NekoLive binary proxy response failed, using compatibility mode:", error.message);
+    }
+  }
+
+  ws.send(JSON.stringify({
+    type: "proxy_response",
+    requestId,
+    status: payload.status,
+    headers: payload.headers || {},
+    bodyBase64: body.toString("base64"),
+    upstreamBase: payload.upstreamBase || ""
+  }));
+}
+
 async function handleProxyRequest(data) {
   const ws = tunnelSocket;
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   const requestId = String(data.requestId || "");
   if (!requestId) return;
 
-  const sendResponse = (payload) => {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "proxy_response", requestId, ...payload }));
-    }
-  };
+  const sendResponse = (payload) => sendProxyResponse(ws, requestId, payload);
 
   if (data.kind !== "llhls") {
-    sendResponse({ status: 400, headers: { "content-type": "text/plain" }, bodyBase64: "" });
+    sendResponse({ status: 400, headers: { "content-type": "text/plain" }, body: Buffer.alloc(0) });
     return;
   }
 
   const relativePath = String(data.path || "").replace(/^\/+/, "");
   if (!relativePath || relativePath.includes("..") || relativePath.includes("\\") || relativePath.includes("://")) {
-    sendResponse({ status: 400, headers: { "content-type": "text/plain" }, bodyBase64: "" });
+    sendResponse({ status: 400, headers: { "content-type": "text/plain" }, body: Buffer.alloc(0) });
     return;
   }
 
@@ -298,7 +344,7 @@ async function handleProxyRequest(data) {
     sendResponse({
       status: upstream.status,
       headers,
-      bodyBase64: body.toString("base64"),
+      body,
       upstreamBase: `${base.origin}${root}`
     });
   } catch (error) {
@@ -306,16 +352,26 @@ async function handleProxyRequest(data) {
     sendResponse({
       status: 502,
       headers: { "content-type": "text/plain" },
-      bodyBase64: Buffer.from("Selfhost media upstream unavailable.").toString("base64")
+      body: Buffer.from("Selfhost media upstream unavailable.")
     });
   }
 }
 
-async function handleTunnelMessage(raw) {
+async function handleTunnelMessage(raw, isBinary = false) {
+  if (isBinary) return;
+
   let data;
   try {
     data = JSON.parse(String(raw));
   } catch (_) {
+    return;
+  }
+
+  if (data.type === "tunnel_ready") {
+    tunnelCapabilities = {
+      proxyBinaryV1: data?.capabilities?.proxyBinaryV1 === true
+    };
+    try { tunnelSocket?._socket?.setNoDelay?.(true); } catch (_) {}
     return;
   }
 
@@ -365,12 +421,14 @@ async function ensureTunnel() {
     return;
   }
   tunnelSocket = ws;
+  tunnelCapabilities = { proxyBinaryV1: false };
 
-  ws.on("message", (raw) => {
-    handleTunnelMessage(raw).catch(() => {});
+  ws.on("message", (raw, isBinary) => {
+    handleTunnelMessage(raw, isBinary).catch(() => {});
   });
   ws.on("close", () => {
     if (tunnelSocket === ws) tunnelSocket = null;
+    tunnelCapabilities = { proxyBinaryV1: false };
     scheduleTunnelReconnect();
   });
   ws.on("error", () => {});
