@@ -1,6 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
+const axios = require("axios");
 const { ensureAuthenticated } = require("../middleware/auth");
 const { loadConfig } = require("../config/loader");
 const Settings = require("../models/Settings");
@@ -10,11 +11,49 @@ const federationClient = require("../services/federationClient");
 const router = express.Router();
 const BCRYPT_ROUNDS = 12;
 const NEKOLIVE_HUB_URL = "https://nekolive.co.uk";
+const GAMES_CACHE_MS = 5 * 60 * 1000;
+let gamesCache = { expiresAt: 0, games: [] };
+
 router.use(ensureAuthenticated);
+
+async function fetchNekoLiveGames({ force = false } = {}) {
+  if (!force && gamesCache.expiresAt > Date.now()) return gamesCache.games;
+
+  try {
+    const response = await axios.get(`${NEKOLIVE_HUB_URL}/api/games`, {
+      timeout: 5000,
+      headers: { Accept: "application/json" },
+      validateStatus: () => true
+    });
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`NekoLive games API returned ${response.status}`);
+    }
+
+    const games = Array.isArray(response.data?.games)
+      ? response.data.games
+          .filter((game) => game && String(game.name || "").trim())
+          .map((game) => ({
+            id: game.id,
+            name: String(game.name).trim(),
+            image: String(game.image || ""),
+            url: String(game.url || "")
+          }))
+      : [];
+
+    gamesCache = { expiresAt: Date.now() + GAMES_CACHE_MS, games };
+    return games;
+  } catch (error) {
+    console.warn("Could not load NekoLive game categories:", error.message);
+    return gamesCache.games;
+  }
+}
 
 router.get("/", async (req, res) => {
   const settings = await Settings.findByPk(1);
-  const bans = await BannedConnection.findAll({ order: [["createdAt", "DESC"]] });
+  const [bans, games] = await Promise.all([
+    BannedConnection.findAll({ order: [["createdAt", "DESC"]] }),
+    fetchNekoLiveGames()
+  ]);
   const federationMessage = req.session.federationMessage || null;
   delete req.session.federationMessage;
   const config = loadConfig();
@@ -22,6 +61,7 @@ router.get("/", async (req, res) => {
     pageTitle: "Admin Dashboard",
     settings,
     bans,
+    games,
     siteUrl: config.siteUrl || "",
     nekoliveHubUrl: NEKOLIVE_HUB_URL,
     nodeIdentity: federationClient.getNodeIdentity(),
@@ -34,6 +74,21 @@ router.post("/channel", async (req, res) => {
   settings.channelName = String(req.body.channelName || settings.channelName).trim().toLowerCase();
   settings.channelTitle = String(req.body.channelTitle || "").trim();
   settings.channelBio = String(req.body.channelBio || "").trim();
+
+  const requestedGame = String(req.body.channelGame || "").trim();
+  if (!requestedGame) {
+    settings.channelGame = null;
+  } else {
+    const games = await fetchNekoLiveGames({ force: true });
+    const match = games.find((game) => game.name === requestedGame);
+    if (match) {
+      settings.channelGame = match.name;
+    } else {
+      req.session.federationMessage =
+        "Channel details saved, but the selected game is no longer available on NekoLive.";
+    }
+  }
+
   await settings.save();
   federationClient.heartbeat().catch(() => {});
   res.redirect("/admin");
