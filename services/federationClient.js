@@ -68,6 +68,7 @@ async function pair({ hubUrl, publicUrl, pairingCode }) {
   settings.federationPublicUrl = publicBase;
   settings.federationNodeId = response.data.nodeId;
   settings.federationNodeSecret = response.data.nodeSecret;
+  settings.federationChannelName = response.data.channelName || null;
   settings.federationEnabled = true;
   settings.federationBlocked = false;
   await settings.save();
@@ -98,6 +99,9 @@ async function heartbeat() {
     const payload = {
       publicUrl: settings.federationPublicUrl,
       channel: {
+        // This local name is metadata only. The central NekoLive hub uses the
+        // account that generated the pairing code as the authoritative
+        // channel identity and ignores this field for channel ownership.
         name: settings.channelName,
         title: settings.channelTitle || "",
         bio: settings.channelBio || "",
@@ -122,6 +126,9 @@ async function heartbeat() {
     if (response.status >= 200 && response.status < 300) {
       const blocked = !!(response.data?.blocked || response.data?.terminated);
       settings.federationBlocked = blocked;
+      if (response.data?.channelName) {
+        settings.federationChannelName = String(response.data.channelName).slice(0, 80);
+      }
       settings.federationLastSeenAt = new Date();
       await settings.save();
     }
@@ -157,6 +164,7 @@ async function disconnect() {
     settings.federationPublicUrl = null;
     settings.federationNodeId = null;
     settings.federationNodeSecret = null;
+    settings.federationChannelName = null;
     settings.federationBlocked = false;
     settings.federationLastSeenAt = null;
     await settings.save();
