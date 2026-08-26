@@ -11,6 +11,10 @@ function withTrailingSlash(value) {
   return base.endsWith("/") ? base : `${base}/`;
 }
 
+function withoutTrailingSlash(value) {
+  return String(value || "").trim().replace(/\/+$/, "");
+}
+
 const OME_VHOST = "default";
 
 // OvenMediaEngine's REST API auth: Basic base64(<AccessToken>) — not the
@@ -45,12 +49,25 @@ async function getOmeStreamInfo(node, streamName) {
   }
 }
 
-// OME-flavored playback URLs — a single URL per app/stream disambiguated by
-// a `direction` query param (`whip` for ingest, `whep` for playback).
-function resolveOmePlaybackUrls(node, streamName) {
+// Browser-facing playback defaults to the Selfhost origin. `playerurl` and
+// `webrtcurl` are then private upstream addresses used only by omeProxy.js.
+// Pass publicBase for an absolute URL (needed by federation heartbeats); omit
+// it for a same-origin relative URL returned to the local browser.
+function resolveOmePlaybackUrls(node, streamName, publicBase = "") {
   const name = String(streamName || "").toLowerCase();
   const appName = node?.appName || "app";
   if (!name) return { llhls: "", webrtc: "" };
+
+  if (node?.proxyPlayback !== false) {
+    const base = withoutTrailingSlash(publicBase);
+    return {
+      llhls: `${base}/ome/llhls/${encodeURIComponent(appName)}/${encodeURIComponent(name)}/llhls.m3u8`,
+      webrtc: `${base}/ome/webrtc/${encodeURIComponent(appName)}/${encodeURIComponent(name)}?direction=whep`
+    };
+  }
+
+  // Backwards-compatible direct-to-OME mode for deployments that explicitly
+  // disable the Selfhost proxy.
   return {
     llhls: node.playerurl ? `${withTrailingSlash(node.playerurl)}${appName}/${name}/llhls.m3u8` : "",
     webrtc: node.webrtcurl ? `${withTrailingSlash(node.webrtcurl)}${appName}/${name}?direction=whep` : ""
