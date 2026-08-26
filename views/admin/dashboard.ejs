@@ -22,8 +22,21 @@
       <section class="nl-card">
         <h2>Channel info</h2>
         <form method="POST" action="/admin/channel">
-          <div class="nl-field"><label class="nl-label">Channel name</label><input class="nl-input" type="text" name="channelName" value="<%= settings.channelName %>" maxlength="40" required /></div>
+          <div class="nl-field"><label class="nl-label">Channel name</label><input class="nl-input" type="text" name="channelName" value="<%= settings.channelName %>" maxlength="40" required /><p class="nl-help">Guest relay uses this as its public Selfhost display name when it does not conflict with an existing NekoLive account.</p></div>
           <div class="nl-field"><label class="nl-label">Stream title</label><input class="nl-input" type="text" name="channelTitle" value="<%= settings.channelTitle || '' %>" maxlength="140" /></div>
+          <div class="nl-field">
+            <label class="nl-label">Game category</label>
+            <select class="nl-input" name="channelGame">
+              <option value="" <%= !settings.channelGame ? 'selected' : '' %>>Uncategorized</option>
+              <% if (settings.channelGame && !games.some(function(game) { return game.name === settings.channelGame; })) { %>
+                <option value="<%= settings.channelGame %>" selected><%= settings.channelGame %> (currently saved)</option>
+              <% } %>
+              <% games.forEach(function(game) { %>
+                <option value="<%= game.name %>" <%= settings.channelGame === game.name ? 'selected' : '' %>><%= game.name %></option>
+              <% }); %>
+            </select>
+            <p class="nl-help">Loaded directly from NekoLive's game/category list. When this node is paired to an owned NekoLive channel, the same category is used there too.</p>
+          </div>
           <div class="nl-field"><label class="nl-label">Bio</label><textarea class="nl-textarea" name="channelBio" rows="3" maxlength="500"><%= settings.channelBio || '' %></textarea></div>
           <button class="nl-btn" type="submit">Save channel info</button>
         </form>
@@ -67,15 +80,16 @@
 
           <div style="margin-top:1.5rem; padding-top:1.25rem; border-top:1px solid var(--border);">
             <h3>Anonymous / no-account relay</h3>
-            <p class="nl-help">No NekoLive user account is created. Selfhost connects to the official NekoLive hub automatically, which creates only a guest federation identity tied to this permanent Node ID and proxies LL-HLS through NekoLive. You can later disconnect it and pair a real owned channel.</p>
+            <p class="nl-help">No NekoLive user account is created. Selfhost connects to the official NekoLive hub automatically, which creates only a guest federation identity tied to this permanent Node ID and proxies LL-HLS through NekoLive. Your local channel name becomes the public Selfhost display name unless that name already belongs to a real NekoLive account.</p>
             <form method="POST" action="/admin/federation/guest">
               <button class="nl-btn secondary" type="submit">Start anonymous NekoLive relay</button>
             </form>
           </div>
         <% } else { %>
           <% if (settings.federationChannelName) { %>
-            <div class="nl-kv"><span><%= settings.federationGuestNode ? 'Guest relay name' : 'Linked NekoLive channel' %></span><strong><%= settings.federationChannelName %></strong></div>
+            <div class="nl-kv"><span><%= settings.federationGuestNode ? 'Public Selfhost name' : 'Linked NekoLive channel' %></span><strong><%= settings.federationChannelName %></strong></div>
           <% } %>
+          <% if (settings.channelGame) { %><div class="nl-kv"><span>Game category</span><strong><%= settings.channelGame %></strong></div><% } %>
           <div class="nl-kv"><span>Federation Node ID</span><code><%= settings.federationNodeId %></code></div>
           <div class="nl-kv"><span>Hub</span><strong><%= settings.federationHubUrl %></strong></div>
           <div class="nl-kv"><span>Transport</span><strong><%= settings.federationTransportMode === 'tunnel' ? 'NekoLive Proxy / outbound tunnel' : 'Direct Selfhost playback' %></strong></div>
@@ -90,7 +104,7 @@
           <% if (!settings.federationGuestNode) { %>
             <p class="nl-help">The NekoLive hub owns the linked channel identity. Changing the local Selfhost channel name cannot move this node to another account. To change channels, disconnect and pair again while signed into the other account.</p>
           <% } else { %>
-            <p class="nl-help">Guest mode is not a fake NekoLive account. It is only a federation relay identity, so there are no generated account credentials to steal or maintain.</p>
+            <p class="nl-help">Guest mode is not a fake NekoLive account. Its friendly name is display-only and the immutable Node ID remains the actual federation identity.</p>
           <% } %>
           <p class="nl-help">A central block affects NekoLive federation only. Your local Selfhost stream remains available locally.</p>
           <form method="POST" action="/admin/federation/disconnect" onsubmit="return confirm('Disconnect this node from NekoLive? Your local stream will keep working.');"><button class="nl-btn danger" type="submit">Disconnect relay node</button></form>
