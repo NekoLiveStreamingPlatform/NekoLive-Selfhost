@@ -22,6 +22,9 @@ Settings.init(
     federationPublicUrl: { type: DataTypes.STRING(500), allowNull: true },
     federationNodeId: { type: DataTypes.STRING(80), allowNull: true },
     federationNodeSecret: { type: DataTypes.TEXT, allowNull: true },
+    // Authoritative NekoLive channel returned by the central pairing hub.
+    // This is intentionally separate from the local Selfhost channelName.
+    federationChannelName: { type: DataTypes.STRING(80), allowNull: true },
     federationBlocked: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     federationLastSeenAt: { type: DataTypes.DATE, allowNull: true }
   },
