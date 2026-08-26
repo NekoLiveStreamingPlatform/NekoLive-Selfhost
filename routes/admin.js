@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const { ensureAuthenticated } = require("../middleware/auth");
+const { loadConfig } = require("../config/loader");
 const Settings = require("../models/Settings");
 const BannedConnection = require("../models/BannedConnection");
 const federationClient = require("../services/federationClient");
@@ -15,10 +16,12 @@ router.get("/", async (req, res) => {
   const bans = await BannedConnection.findAll({ order: [["createdAt", "DESC"]] });
   const federationMessage = req.session.federationMessage || null;
   delete req.session.federationMessage;
+  const config = loadConfig();
   res.render("admin/dashboard", {
     pageTitle: "Admin Dashboard",
     settings,
     bans,
+    siteUrl: config.siteUrl || "",
     messages: { channel: null, account: null, ban: null, federation: federationMessage }
   });
 });
@@ -79,12 +82,14 @@ router.post("/stream-key/regenerate", async (req, res) => {
 
 router.post("/federation/pair", async (req, res) => {
   try {
-    await federationClient.pair({
+    const settings = await federationClient.pair({
       hubUrl: req.body.hubUrl,
       publicUrl: req.body.publicUrl,
       pairingCode: req.body.pairingCode
     });
-    req.session.federationMessage = "Selfhost node paired with NekoLive successfully.";
+    req.session.federationMessage = settings.federationChannelName
+      ? `Selfhost node paired with NekoLive channel ${settings.federationChannelName} successfully.`
+      : "Selfhost node paired with NekoLive successfully.";
   } catch (error) {
     req.session.federationMessage = error.message;
   }
