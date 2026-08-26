@@ -1,9 +1,6 @@
 const { Model, DataTypes } = require("sequelize");
 const sequelize = require("../db");
 
-// Singleton row (id is always 1) — this app has exactly one owner and one
-// channel, so there's no point normalizing this into separate tables the
-// way NekoLive's multi-tenant Channel/User split needs to.
 class Settings extends Model {}
 Settings.init(
   {
@@ -14,14 +11,19 @@ Settings.init(
     ownerUsername: { type: DataTypes.STRING, allowNull: false },
     ownerEmail: { type: DataTypes.STRING, allowNull: false },
     passwordHash: { type: DataTypes.STRING, allowNull: false },
-    // Generated on /setup, shown (and regeneratable) from the admin
-    // dashboard — not something the owner hand-edits into config.json. This
-    // is what OME's admission webhook checks incoming publishes against
-    // (routes/api/admission.js), via a `?jwt=` query param on the ingest URL.
-    streamKey: { type: DataTypes.STRING, allowNull: false }
-    // Multistream targets (formerly a single relayEnabled/relayRtmpUrl/
-    // relayStreamKey/relayOmePushId set here) now live in their own
-    // PushTarget rows — see models/PushTarget.js and services/multistream.js.
+    streamKey: { type: DataTypes.STRING, allowNull: false },
+
+    // NekoLive federation credentials are deliberately separate from the
+    // creator's ingest/stream key. A one-time pairing code exchanges for a
+    // node identity + HMAC secret, so linking a Selfhost node never requires
+    // copying a broadcast key into the central NekoLive service.
+    federationEnabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    federationHubUrl: { type: DataTypes.STRING(500), allowNull: true },
+    federationPublicUrl: { type: DataTypes.STRING(500), allowNull: true },
+    federationNodeId: { type: DataTypes.STRING(80), allowNull: true },
+    federationNodeSecret: { type: DataTypes.TEXT, allowNull: true },
+    federationBlocked: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    federationLastSeenAt: { type: DataTypes.DATE, allowNull: true }
   },
   { sequelize, modelName: "Settings", tableName: "Settings", timestamps: true }
 );
