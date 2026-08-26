@@ -12,15 +12,18 @@ RUN npm install --omit=dev
 COPY . .
 
 # Fail the multi-arch image build before publishing if a runtime JavaScript
-# file contains a syntax error. EJS templates are exercised separately at
-# runtime, but these cover the server/federation path added for Selfhost relay.
+# file contains a syntax error. Compile the admin EJS too because federation
+# settings/game-category UI changes live there and a malformed template would
+# otherwise only fail when a creator opens /admin.
 RUN node --check app.js \
+ && node --check models/Settings.js \
  && node --check routes/admin.js \
  && node --check routes/api/omeProxy.js \
  && node --check chat/chatServer.js \
  && node --check services/nodeIdentity.js \
  && node --check services/federationClient.js \
- && node --check services/omeClient.js
+ && node --check services/omeClient.js \
+ && node -e "require('ejs').compile(require('fs').readFileSync('views/admin/dashboard.ejs','utf8'))"
 
 # Only runtime data is declared as a Docker volume. config/ also contains
 # application code (config/loader.js), so mounting the whole directory would
