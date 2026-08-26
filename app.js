@@ -42,8 +42,6 @@ app.use(
 app.use("/api/admission/ome", admissionRouter);
 app.use(requireSetupComplete);
 
-// Browser-facing OME playback stays on the Selfhost origin. The configured
-// OME player/WebRTC URLs can therefore be Docker/LAN-only addresses.
 app.use("/ome", omeProxyRouter);
 app.use("/api/stream", streamRouter);
 app.use("/api/multistream", multistreamRouter);
@@ -55,6 +53,8 @@ app.use((req, res) => res.status(404).send("Not found"));
 
 const server = http.createServer(app);
 chatServer.start(server);
+chatServer.setRelaySender(federationClient.sendChatMessage);
+federationClient.setChatInjector(chatServer.broadcastFederatedMessage);
 
 sequelize
   .sync({ alter: true })
