@@ -48,6 +48,60 @@ async function fetchNekoLiveGames({ force = false } = {}) {
   }
 }
 
+// Same-origin live game search for the Selfhost admin UI. Every request goes
+// to NekoLive's canonical /api/games endpoint so Selfhost never maintains its
+// own game/category catalogue. Keeping the browser on /admin also avoids CORS
+// and Cloudflare-origin issues for LAN/private Selfhost installs.
+router.get("/games/search", async (req, res) => {
+  const search = String(req.query.search || "").trim().slice(0, 100);
+
+  try {
+    const response = await axios.get(`${NEKOLIVE_HUB_URL}/api/games`, {
+      params: { search },
+      timeout: 5000,
+      headers: { Accept: "application/json" },
+      validateStatus: () => true
+    });
+
+    if (response.status < 200 || response.status >= 300) {
+      return res.status(502).json({
+        games: [],
+        error: `NekoLive games API returned ${response.status}`
+      });
+    }
+
+    const term = search.toLowerCase();
+    const games = Array.isArray(response.data?.games)
+      ? response.data.games
+          .filter((game) => game && String(game.name || "").trim())
+          .map((game) => ({
+            id: game.id,
+            name: String(game.name).trim(),
+            image: String(game.image || ""),
+            url: String(game.url || "")
+          }))
+          // Keep filtering locally as a fallback in case the public API ever
+          // ignores the optional search parameter and returns the full list.
+          .filter((game) => !term || game.name.toLowerCase().includes(term))
+          .sort((a, b) => {
+            if (term) {
+              const aStarts = a.name.toLowerCase().startsWith(term) ? 1 : 0;
+              const bStarts = b.name.toLowerCase().startsWith(term) ? 1 : 0;
+              if (aStarts !== bStarts) return bStarts - aStarts;
+            }
+            return a.name.localeCompare(b.name);
+          })
+          .slice(0, 60)
+      : [];
+
+    res.set("Cache-Control", "no-store");
+    return res.json({ games });
+  } catch (error) {
+    console.warn("Live NekoLive game search failed:", error.message);
+    return res.status(502).json({ games: [], error: "Could not load NekoLive games." });
+  }
+});
+
 router.get("/", async (req, res) => {
   const settings = await Settings.findByPk(1);
   const [bans, games] = await Promise.all([
