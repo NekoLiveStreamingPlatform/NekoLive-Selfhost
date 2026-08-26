@@ -190,6 +190,43 @@ function scheduleTunnelReconnect() {
   tunnelReconnectTimer.unref?.();
 }
 
+function absoluteManifestUri(value, base) {
+  const uri = String(value || "").trim();
+  if (!uri || /^https?:\/\//i.test(uri) || uri.startsWith("data:")) return uri;
+  if (uri.startsWith("//")) return `${base.protocol}${uri}`;
+  if (uri.startsWith("/")) return `${base.origin}${uri}`;
+  return uri;
+}
+
+// OME may place root-relative URIs (/app/live/...) in LL-HLS manifests.
+// Those are correct when a browser talks directly to OME, but through the
+// NekoLive tunnel they would resolve against https://nekolive.co.uk/app/...
+// and 404. Convert only root/protocol-relative references to absolute OME
+// URLs here. The central relay already rewrites that configured OME base back
+// to /streamnode/federation/proxy/<node>/llhls/, so every nested playlist,
+// part, init segment and key stays inside the authenticated relay route.
+function normalizeLlhlsManifestForRelay(body, base) {
+  let text = Buffer.from(body).toString("utf8");
+
+  text = text.replace(/URI=(['"])([^'"]+)\1/g, (match, quote, uri) => {
+    const normalized = absoluteManifestUri(uri, base);
+    return `URI=${quote}${normalized}${quote}`;
+  });
+
+  text = text
+    .split(/\r?\n/)
+    .map((line) => {
+      if (!line || line.trimStart().startsWith("#")) return line;
+      const leading = line.match(/^\s*/)?.[0] || "";
+      const trailing = line.match(/\s*$/)?.[0] || "";
+      const uri = line.trim();
+      return `${leading}${absoluteManifestUri(uri, base)}${trailing}`;
+    })
+    .join("\n");
+
+  return Buffer.from(text);
+}
+
 async function handleProxyRequest(data) {
   const ws = tunnelSocket;
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -238,7 +275,7 @@ async function handleProxyRequest(data) {
       validateStatus: () => true
     });
 
-    const body = Buffer.from(upstream.data || Buffer.alloc(0));
+    let body = Buffer.from(upstream.data || Buffer.alloc(0));
     if (body.length > MAX_PROXY_BODY) throw new Error("OME relay response exceeded limit");
     const headers = {};
     for (const name of [
@@ -246,6 +283,16 @@ async function handleProxyRequest(data) {
       "accept-ranges", "content-range", "content-length"
     ]) {
       if (upstream.headers?.[name] != null) headers[name] = upstream.headers[name];
+    }
+
+    const contentType = String(upstream.headers?.["content-type"] || "").toLowerCase();
+    if (body.length && (contentType.includes("mpegurl") || relativePath.toLowerCase().endsWith(".m3u8"))) {
+      body = normalizeLlhlsManifestForRelay(body, base);
+      headers["content-length"] = String(body.length);
+    }
+
+    if (upstream.status >= 400) {
+      console.warn(`NekoLive tunnel OME response ${upstream.status}: ${target.pathname}${target.search}`);
     }
 
     sendResponse({
