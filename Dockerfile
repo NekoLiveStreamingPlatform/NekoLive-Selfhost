@@ -11,9 +11,10 @@ RUN npm install --omit=dev
 
 COPY . .
 
-# config/config.json and data/ are both gitignored (secrets + the SQLite
-# file) — provided at runtime via volumes, see docker-compose.yml.
-VOLUME ["/app/config", "/app/data"]
+# Only runtime data is declared as a Docker volume. config/ also contains
+# application code (config/loader.js), so mounting the whole directory would
+# mask that code. docker-compose.yml mounts only config/config.json instead.
+VOLUME ["/app/data"]
 
 EXPOSE 8090
 
