@@ -114,6 +114,11 @@ async function pair({ hubUrl, publicUrl, pairingCode, transportMode = "direct" }
     throw new Error(response.data?.error || `NekoLive pairing failed (${response.status}).`);
   }
 
+  // Pairing rotates the node secret and may convert an already-running guest
+  // tunnel into an owned channel. Drop the old socket before using the new
+  // credentials so the central tunnel never keeps stale guest ownership.
+  closeTunnel();
+
   const settings = await Settings.findByPk(1);
   settings.federationHubUrl = hub;
   settings.federationPublicUrl = mode === "direct" ? publicBase : null;
@@ -167,8 +172,6 @@ async function registerGuest({ hubUrl }) {
 
   await ensureTunnel();
   await heartbeat();
-  // Heartbeat replaces the temporary guest-<node> label with the safe local
-  // Selfhost display name when it does not collide with a real NekoLive user.
   await settings.reload();
   return settings;
 }
@@ -202,13 +205,6 @@ function absoluteManifestUri(value, base) {
   return uri;
 }
 
-// OME may place root-relative URIs (/app/live/...) in LL-HLS manifests.
-// Those are correct when a browser talks directly to OME, but through the
-// NekoLive tunnel they would resolve against https://nekolive.co.uk/app/...
-// and 404. Convert only root/protocol-relative references to absolute OME
-// URLs here. The central relay already rewrites that configured OME base back
-// to /streamnode/federation/proxy/<node>/llhls/, so every nested playlist,
-// part, init segment and key stays inside the authenticated relay route.
 function normalizeLlhlsManifestForRelay(body, base) {
   let text = Buffer.from(body).toString("utf8");
 
@@ -413,9 +409,6 @@ async function heartbeat() {
       relayEnabled: Boolean(settings.federationRelayEnabled),
       publicUrl: tunnelMode ? null : settings.federationPublicUrl,
       channel: {
-        // For a paired account, NekoLive ignores this name and uses the owned
-        // account channel. For a guest node, NekoLive may use it only as a
-        // display name after checking that it does not claim an existing user.
         name: settings.channelName,
         title: settings.channelTitle || "",
         bio: settings.channelBio || "",
@@ -474,6 +467,44 @@ async function setRelayEnabled(enabled) {
   await heartbeat();
 }
 
+async function unlinkAccountToGuest() {
+  const settings = await Settings.findByPk(1);
+  if (!settings?.federationEnabled || !settings.federationNodeId || !settings.federationNodeSecret || !settings.federationHubUrl) {
+    throw new Error("This Selfhost node is not linked to NekoLive.");
+  }
+  if (settings.federationGuestNode) return settings;
+
+  const payload = { channelName: settings.channelName || "" };
+  const response = await axios.post(
+    `${normalizeBaseUrl(settings.federationHubUrl)}/streamnode/federation/unlink-account`,
+    payload,
+    {
+      headers: signedHeaders(settings, payload),
+      timeout: 8_000,
+      validateStatus: () => true
+    }
+  );
+
+  if (response.status < 200 || response.status >= 300 || !response.data?.guestNode) {
+    throw new Error(response.data?.error || `Failed to unlink NekoLive account (${response.status}).`);
+  }
+
+  closeTunnel();
+  settings.federationGuestNode = true;
+  settings.federationTransportMode = "tunnel";
+  settings.federationRelayEnabled = true;
+  settings.federationPublicUrl = null;
+  settings.federationChannelName = response.data.channelName || null;
+  settings.federationBlocked = false;
+  settings.federationLastSeenAt = new Date();
+  await settings.save();
+
+  await ensureTunnel();
+  await heartbeat();
+  await settings.reload();
+  return settings;
+}
+
 function setChatInjector(fn) {
   chatInjector = typeof fn === "function" ? fn : null;
 }
@@ -506,9 +537,7 @@ async function disconnect() {
           validateStatus: () => true
         }
       );
-    } catch (_) {
-      // Local unlink must still work when the central service is unreachable.
-    }
+    } catch (_) {}
   }
 
   closeTunnel();
@@ -559,6 +588,7 @@ function stop() {
 module.exports = {
   pair,
   registerGuest,
+  unlinkAccountToGuest,
   disconnect,
   heartbeat,
   setRelayEnabled,
