@@ -22,6 +22,7 @@ router.get("/", async (req, res) => {
     settings,
     bans,
     siteUrl: config.siteUrl || "",
+    nodeIdentity: federationClient.getNodeIdentity(),
     messages: { channel: null, account: null, ban: null, federation: federationMessage }
   });
 });
@@ -82,14 +83,39 @@ router.post("/stream-key/regenerate", async (req, res) => {
 
 router.post("/federation/pair", async (req, res) => {
   try {
+    const transportMode = req.body.transportMode === "tunnel" ? "tunnel" : "direct";
     const settings = await federationClient.pair({
       hubUrl: req.body.hubUrl,
       publicUrl: req.body.publicUrl,
-      pairingCode: req.body.pairingCode
+      pairingCode: req.body.pairingCode,
+      transportMode
     });
     req.session.federationMessage = settings.federationChannelName
       ? `Selfhost node paired with NekoLive channel ${settings.federationChannelName} successfully.`
       : "Selfhost node paired with NekoLive successfully.";
+  } catch (error) {
+    req.session.federationMessage = error.message;
+  }
+  res.redirect("/admin");
+});
+
+router.post("/federation/guest", async (req, res) => {
+  try {
+    const settings = await federationClient.registerGuest({ hubUrl: req.body.hubUrl });
+    req.session.federationMessage = `Anonymous NekoLive relay enabled as ${settings.federationChannelName}. No NekoLive account was created.`;
+  } catch (error) {
+    req.session.federationMessage = error.message;
+  }
+  res.redirect("/admin");
+});
+
+router.post("/federation/relay", async (req, res) => {
+  try {
+    const enabled = String(req.body.enabled || "") === "true";
+    await federationClient.setRelayEnabled(enabled);
+    req.session.federationMessage = enabled
+      ? "NekoLive relay enabled. Your local stream remains the source."
+      : "NekoLive relay disabled. Your local Selfhost stream is still running normally.";
   } catch (error) {
     req.session.federationMessage = error.message;
   }
