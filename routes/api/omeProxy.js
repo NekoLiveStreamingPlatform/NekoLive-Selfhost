@@ -4,6 +4,7 @@ const https = require("https");
 const { loadConfig } = require("../../config/loader");
 
 const router = express.Router();
+const MAX_MANIFEST_BYTES = 2 * 1024 * 1024;
 
 function getUpstream(kind) {
   const config = loadConfig();
@@ -49,6 +50,65 @@ function rewriteLocation(value, base, publicPrefix) {
   }
 }
 
+function rewriteManifestUri(value, base, publicPrefix) {
+  const uri = String(value || "").trim();
+  if (!uri || uri.startsWith("data:")) return uri;
+
+  // Relative child paths such as chunklist_*.m3u8 already resolve correctly
+  // underneath /ome/llhls/<app>/<stream>/, so leave those untouched.
+  if (!uri.startsWith("/") && !/^https?:\/\//i.test(uri)) return uri;
+
+  try {
+    // Protocol-relative URLs need an explicit scheme before URL parsing.
+    const resolved = uri.startsWith("//")
+      ? new URL(`${base.protocol}${uri}`)
+      : uri.startsWith("/")
+        ? new URL(uri, base.origin)
+        : new URL(uri);
+
+    // Never rewrite a genuinely external key/CDN URL.
+    if (resolved.origin !== base.origin) return uri;
+
+    const basePath = base.pathname.endsWith("/") ? base.pathname : `${base.pathname}/`;
+    let relativePath = resolved.pathname;
+    if (basePath !== "/" && relativePath.startsWith(basePath)) {
+      relativePath = relativePath.slice(basePath.length);
+    } else {
+      relativePath = relativePath.replace(/^\/+/, "");
+    }
+
+    return `${publicPrefix}/${relativePath}${resolved.search}${resolved.hash}`;
+  } catch (_) {
+    return uri;
+  }
+}
+
+function rewriteLlhlsManifest(body, base, publicPrefix) {
+  let text = Buffer.concat(body).toString("utf8");
+
+  // URI attributes used by EXT-X-MAP, EXT-X-PART, EXT-X-PRELOAD-HINT,
+  // EXT-X-KEY, EXT-X-MEDIA and similar tags.
+  text = text.replace(/URI=(['"])([^'"]+)\1/g, (_match, quote, uri) => {
+    return `URI=${quote}${rewriteManifestUri(uri, base, publicPrefix)}${quote}`;
+  });
+  text = text.replace(/URI=([^,'"\s]+)/g, (_match, uri) => {
+    return `URI=${rewriteManifestUri(uri, base, publicPrefix)}`;
+  });
+
+  // Non-comment lines are playlist/segment/part URIs.
+  text = text
+    .split(/\r?\n/)
+    .map((line) => {
+      if (!line || line.trimStart().startsWith("#")) return line;
+      const leading = line.match(/^\s*/)?.[0] || "";
+      const trailing = line.match(/\s*$/)?.[0] || "";
+      return `${leading}${rewriteManifestUri(line.trim(), base, publicPrefix)}${trailing}`;
+    })
+    .join("\n");
+
+  return Buffer.from(text, "utf8");
+}
+
 function proxyToOme(kind, publicPrefix) {
   return (req, res) => {
     let base;
@@ -61,6 +121,10 @@ function proxyToOme(kind, publicPrefix) {
     const { wildcard, query } = getRequestSuffix(req);
     const transport = base.protocol === "https:" ? https : http;
     const headers = { ...req.headers, host: base.host };
+
+    // Manifest rewriting requires plain bytes rather than a compressed OME
+    // response. Segments/parts are normally already media-compressed.
+    if (kind === "llhls") headers["accept-encoding"] = "identity";
 
     // These describe the public Selfhost origin to OME while Host itself must
     // remain the configured upstream host. OME should never need to know or
@@ -92,8 +156,42 @@ function proxyToOme(kind, publicPrefix) {
           );
         }
 
-        res.writeHead(upstreamRes.statusCode || 502, responseHeaders);
-        upstreamRes.pipe(res);
+        const contentType = String(responseHeaders["content-type"] || "").toLowerCase();
+        const isManifest =
+          kind === "llhls" &&
+          req.method !== "HEAD" &&
+          (contentType.includes("mpegurl") || wildcard.toLowerCase().endsWith(".m3u8"));
+
+        if (!isManifest) {
+          res.writeHead(upstreamRes.statusCode || 502, responseHeaders);
+          upstreamRes.pipe(res);
+          return;
+        }
+
+        const chunks = [];
+        let size = 0;
+        upstreamRes.on("data", (chunk) => {
+          size += chunk.length;
+          if (size > MAX_MANIFEST_BYTES) {
+            upstreamRes.destroy(new Error("OME LL-HLS manifest exceeded proxy size limit."));
+            return;
+          }
+          chunks.push(chunk);
+        });
+        upstreamRes.on("end", () => {
+          if (res.headersSent) return;
+          const rewritten = rewriteLlhlsManifest(chunks, base, publicPrefix);
+          delete responseHeaders["transfer-encoding"];
+          delete responseHeaders["content-encoding"];
+          responseHeaders["content-length"] = String(rewritten.length);
+          res.writeHead(upstreamRes.statusCode || 502, responseHeaders);
+          res.end(rewritten);
+        });
+        upstreamRes.on("error", (error) => {
+          console.error("OME LL-HLS manifest proxy failed:", error.message);
+          if (!res.headersSent) res.status(502).send("OME LL-HLS manifest unavailable.");
+          else res.destroy(error);
+        });
       }
     );
 
