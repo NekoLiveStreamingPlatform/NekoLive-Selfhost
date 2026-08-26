@@ -8,6 +8,9 @@ Settings.init(
     channelName: { type: DataTypes.STRING, allowNull: false, defaultValue: "channel" },
     channelTitle: { type: DataTypes.STRING, allowNull: true },
     channelBio: { type: DataTypes.TEXT, allowNull: true },
+    // Selected from the official NekoLive Games API in the admin dashboard.
+    // The central federation heartbeat validates it against that same table.
+    channelGame: { type: DataTypes.STRING(120), allowNull: true },
     ownerUsername: { type: DataTypes.STRING, allowNull: false },
     ownerEmail: { type: DataTypes.STRING, allowNull: false },
     passwordHash: { type: DataTypes.STRING, allowNull: false },
@@ -29,8 +32,8 @@ Settings.init(
     federationPublicUrl: { type: DataTypes.STRING(500), allowNull: true },
     federationNodeId: { type: DataTypes.STRING(80), allowNull: true },
     federationNodeSecret: { type: DataTypes.TEXT, allowNull: true },
-    // Authoritative NekoLive channel returned by the central pairing hub.
-    // This is intentionally separate from the local Selfhost channelName.
+    // Authoritative NekoLive channel for paired accounts, or the safe public
+    // display name returned by NekoLive for a guest Selfhost node.
     federationChannelName: { type: DataTypes.STRING(80), allowNull: true },
     federationBlocked: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     federationLastSeenAt: { type: DataTypes.DATE, allowNull: true }
