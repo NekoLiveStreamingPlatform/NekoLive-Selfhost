@@ -23,55 +23,50 @@ function isContainer() {
   }
 }
 
-function hardwareMaterial() {
-  const values = [];
+function readPersisted() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(IDENTITY_FILE, "utf8"));
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function preferredHardwareAnchor() {
   const candidates = [
-    // Common x86/UEFI hosts. Docker normally exposes these read-only from the
-    // host kernel, so the value survives container recreation.
-    "/sys/class/dmi/id/product_uuid",
-    "/sys/class/dmi/id/board_serial",
-    // Raspberry Pi / ARM boards when the device tree is visible.
-    "/proc/device-tree/serial-number",
-    // Optional explicit host machine-id mount for deployments that want it.
-    "/host/etc/machine-id"
+    // Prefer one strong/stable anchor instead of combining every field. That
+    // avoids changing the Node ID merely because a kernel/container update
+    // temporarily stops exposing one secondary DMI property.
+    ["dmi-product-uuid", "/sys/class/dmi/id/product_uuid"],
+    ["dmi-board-serial", "/sys/class/dmi/id/board_serial"],
+    ["device-tree-serial", "/proc/device-tree/serial-number"],
+    ["host-machine-id", "/host/etc/machine-id"]
   ];
 
-  // Outside Docker, the machine-id is also a useful stable host signal. Do
-  // not use a container image's own /etc/machine-id as a hardware identity.
-  if (!isContainer()) candidates.push("/etc/machine-id");
+  if (!isContainer()) candidates.push(["machine-id", "/etc/machine-id"]);
 
-  for (const file of candidates) {
+  for (const [kind, file] of candidates) {
     const value = readTrimmed(file);
-    if (value) values.push(`${path.basename(file)}:${value.toLowerCase()}`);
+    if (value) return { kind, value: value.toLowerCase() };
   }
 
   // Older Raspberry Pi images expose the board serial only through cpuinfo.
   try {
     const cpuinfo = fs.readFileSync("/proc/cpuinfo", "utf8");
     const match = cpuinfo.match(/^Serial\s*:\s*([0-9a-f]+)$/im);
-    if (match?.[1]) values.push(`cpu-serial:${match[1].toLowerCase()}`);
+    if (match?.[1]) return { kind: "cpu-serial", value: match[1].toLowerCase() };
   } catch (_) {}
 
-  return [...new Set(values)].sort();
+  return null;
 }
 
-function digest(parts) {
+function digest(value) {
   return crypto
     .createHash("sha256")
     .update(DOMAIN_SEPARATOR)
     .update("\0")
-    .update(parts.join("\0"))
+    .update(String(value))
     .digest("hex");
-}
-
-function readPersistedFallback() {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(IDENTITY_FILE, "utf8"));
-    if (typeof parsed.fallbackSeed === "string" && /^[a-f0-9]{64}$/.test(parsed.fallbackSeed)) {
-      return parsed.fallbackSeed;
-    }
-  } catch (_) {}
-  return null;
 }
 
 function persist(identity) {
@@ -83,29 +78,46 @@ function persist(identity) {
   }
 }
 
+function validHash(value) {
+  return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+}
+
 function getIdentity() {
-  const material = hardwareMaterial();
+  const persisted = readPersisted();
+  const anchor = preferredHardwareAnchor();
   let hardwareBindingHash;
   let source;
   let fallbackSeed = null;
+  let anchorType = null;
 
-  if (material.length) {
-    // Only this one-way digest leaves the Selfhost process. Raw board serials,
-    // UUIDs and machine IDs are never transmitted to NekoLive.
-    hardwareBindingHash = digest(material);
+  if (anchor) {
+    hardwareBindingHash = digest(`${anchor.kind}:${anchor.value}`);
     source = "hardware";
+    anchorType = anchor.kind;
+  } else if (validHash(persisted?.hardwareBindingHash)) {
+    // If the host temporarily stops exposing DMI/device-tree values, retain
+    // the previously hardware-derived identity from the persistent data
+    // volume instead of unexpectedly creating a different Node ID.
+    hardwareBindingHash = persisted.hardwareBindingHash;
+    source = persisted.source === "hardware" ? "hardware-cached" : "persistent-fallback";
+    fallbackSeed = typeof persisted.fallbackSeed === "string" ? persisted.fallbackSeed : null;
+    anchorType = persisted.anchorType || null;
   } else {
-    fallbackSeed = readPersistedFallback() || crypto.randomBytes(32).toString("hex");
-    hardwareBindingHash = digest([`fallback:${fallbackSeed}`]);
+    fallbackSeed =
+      (typeof persisted?.fallbackSeed === "string" && /^[a-f0-9]{64}$/.test(persisted.fallbackSeed)
+        ? persisted.fallbackSeed
+        : crypto.randomBytes(32).toString("hex"));
+    hardwareBindingHash = digest(`fallback:${fallbackSeed}`);
     source = "persistent-fallback";
   }
 
   const nodeId = `nl-${hardwareBindingHash.slice(0, 32)}`;
   const identity = {
-    version: 1,
+    version: 2,
     nodeId,
     hardwareBindingHash,
     source,
+    ...(anchorType ? { anchorType } : {}),
     ...(fallbackSeed ? { fallbackSeed } : {})
   };
   persist(identity);
