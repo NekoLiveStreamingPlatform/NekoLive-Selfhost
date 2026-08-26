@@ -129,6 +129,7 @@ async function pair({ hubUrl, publicUrl, pairingCode, transportMode = "direct" }
 
   await ensureTunnel();
   await heartbeat();
+  await settings.reload();
   return settings;
 }
 
@@ -166,6 +167,9 @@ async function registerGuest({ hubUrl }) {
 
   await ensureTunnel();
   await heartbeat();
+  // Heartbeat replaces the temporary guest-<node> label with the safe local
+  // Selfhost display name when it does not collide with a real NekoLive user.
+  await settings.reload();
   return settings;
 }
 
@@ -409,11 +413,13 @@ async function heartbeat() {
       relayEnabled: Boolean(settings.federationRelayEnabled),
       publicUrl: tunnelMode ? null : settings.federationPublicUrl,
       channel: {
-        // Metadata only. Account-linked channel ownership and guest channel
-        // names are both assigned centrally and cannot be selected here.
+        // For a paired account, NekoLive ignores this name and uses the owned
+        // account channel. For a guest node, NekoLive may use it only as a
+        // display name after checking that it does not claim an existing user.
         name: settings.channelName,
         title: settings.channelTitle || "",
         bio: settings.channelBio || "",
+        game: settings.channelGame || "",
         isLive: relayLive,
         llhlsUrl: !tunnelMode && relayLive ? playback.llhls : null,
         llhlsPath: tunnelMode && relayLive ? llhlsPath(playback.llhls) : null,
