@@ -30,30 +30,74 @@
       </section>
 
       <section class="nl-card nl-card-accent">
-        <div class="nl-card-title-row"><h2>NekoLive Relay Node</h2><span class="<%= settings.federationNodeId && !settings.federationBlocked ? 'nl-live-badge' : 'nl-offline-badge' %>"><%= settings.federationNodeId ? (settings.federationBlocked ? 'BLOCKED' : 'PAIRED') : 'LOCAL ONLY' %></span></div>
-        <p class="nl-help">Pair this Selfhost install directly to the main NekoLive platform. The one-time code is generated while signed into a NekoLive account, so the node is locked to that exact NekoLive channel instead of choosing a random channel name.</p>
-        <% if (!settings.federationNodeId) { %>
-          <form method="POST" action="/admin/federation/pair">
-            <div class="nl-field">
-              <label class="nl-label">NekoLive hub URL</label>
-              <input id="nl-federation-hub-url" class="nl-input" name="hubUrl" type="url" value="<%= settings.federationHubUrl || '' %>" placeholder="https://nekolive.example" required />
-              <p class="nl-help">This is the root URL of the main NekoLive website. Sign into the NekoLive account/channel you want this node attached to, then open its Selfhost Pairing page.</p>
-              <button class="nl-btn secondary" type="button" style="margin-top:.5rem;" onclick="openNekoLivePairingHub()">Open NekoLive pairing hub</button>
-            </div>
-            <div class="nl-field"><label class="nl-label">This node's public URL</label><input class="nl-input" name="publicUrl" type="url" value="<%= settings.federationPublicUrl || siteUrl || '' %>" placeholder="https://my-node.example" required /><p class="nl-help">Use the public Selfhost URL viewers can reach. With the single-domain proxy this can be the same Cloudflare hostname that points to port 8090.</p></div>
-            <div class="nl-field"><label class="nl-label">One-time pairing code</label><input class="nl-input" name="pairingCode" autocomplete="one-time-code" required /><p class="nl-help">Generate this at <code>/streamnode/federation/connect</code> on the NekoLive hub while signed into the correct channel.</p></div>
-            <button class="nl-btn" type="submit">Pair with NekoLive</button>
-          </form>
+        <div class="nl-card-title-row">
+          <h2>NekoLive Relay Node</h2>
+          <% const relayBadge = !settings.federationEnabled ? 'LOCAL ONLY' : (settings.federationBlocked ? 'BLOCKED' : (!settings.federationRelayEnabled ? 'RELAY OFF' : (settings.federationGuestNode ? 'GUEST RELAY' : 'PAIRED'))); %>
+          <span class="<%= settings.federationEnabled && !settings.federationBlocked && settings.federationRelayEnabled ? 'nl-live-badge' : 'nl-offline-badge' %>"><%= relayBadge %></span>
+        </div>
+
+        <p class="nl-help">Your local stream always belongs to this Selfhost install. NekoLive relay is optional and can be switched off without stopping OME, local playback or local chat.</p>
+        <div class="nl-kv"><span>Permanent Node ID</span><code><%= nodeIdentity.nodeId %></code></div>
+        <div class="nl-kv"><span>Identity source</span><strong><%= nodeIdentity.source === 'hardware' ? 'Hardware-bound hash' : 'Persistent data-volume fallback' %></strong></div>
+        <p class="nl-help">Raw hardware serials are never sent to NekoLive. Only a one-way identity hash is used so a blocked node cannot normally evade the block by deleting and re-pulling its Docker container.</p>
+
+        <% if (!settings.federationEnabled) { %>
+          <div style="margin-top:1.25rem;">
+            <h3>Link your NekoLive channel</h3>
+            <p class="nl-help">Generate the one-time code while signed into the NekoLive account that owns the channel. The hub locks this node to that account; this Selfhost app cannot claim somebody else's channel name.</p>
+            <form method="POST" action="/admin/federation/pair">
+              <div class="nl-field">
+                <label class="nl-label">NekoLive hub URL</label>
+                <input id="nl-federation-hub-url" class="nl-input" name="hubUrl" type="url" placeholder="https://nekolive.example" required />
+                <button class="nl-btn secondary" type="button" style="margin-top:.5rem;" onclick="openNekoLivePairingHub()">Open NekoLive pairing hub</button>
+              </div>
+              <div class="nl-field">
+                <label class="nl-label">Playback transport</label>
+                <select id="nl-federation-transport" class="nl-input" name="transportMode" onchange="updateFederationTransportHelp()">
+                  <option value="tunnel">NekoLive Proxy — no Selfhost domain required</option>
+                  <option value="direct">Direct — viewers connect to my Selfhost domain</option>
+                </select>
+                <p id="nl-federation-transport-help" class="nl-help">Selfhost opens an outbound encrypted WebSocket to NekoLive. No public Selfhost hostname, inbound web port or Cloudflare Tunnel is required.</p>
+              </div>
+              <div id="nl-federation-public-url-field" class="nl-field" style="display:none;">
+                <label class="nl-label">This node's public URL</label>
+                <input id="nl-federation-public-url" class="nl-input" name="publicUrl" type="url" value="<%= siteUrl || '' %>" placeholder="https://my-node.example" />
+                <p class="nl-help">Only required in Direct mode.</p>
+              </div>
+              <div class="nl-field"><label class="nl-label">One-time pairing code</label><input class="nl-input" name="pairingCode" autocomplete="one-time-code" required /><p class="nl-help">Generated at <code>/streamnode/federation/connect</code> on the NekoLive hub.</p></div>
+              <button class="nl-btn" type="submit">Pair owned NekoLive channel</button>
+            </form>
+          </div>
+
+          <div style="margin-top:1.5rem; padding-top:1.25rem; border-top:1px solid var(--border);">
+            <h3>Anonymous / no-account relay</h3>
+            <p class="nl-help">No NekoLive user account is created. The hub creates only a guest federation identity tied to this permanent Node ID and proxies LL-HLS through NekoLive. You can later disconnect it and pair a real owned channel.</p>
+            <form method="POST" action="/admin/federation/guest">
+              <div class="nl-field"><label class="nl-label">NekoLive hub URL</label><input class="nl-input" name="hubUrl" type="url" placeholder="https://nekolive.example" required /></div>
+              <button class="nl-btn secondary" type="submit">Start anonymous NekoLive relay</button>
+            </form>
+          </div>
         <% } else { %>
           <% if (settings.federationChannelName) { %>
-            <div class="nl-kv"><span>Linked channel</span><strong><%= settings.federationChannelName %></strong></div>
+            <div class="nl-kv"><span><%= settings.federationGuestNode ? 'Guest relay name' : 'Linked NekoLive channel' %></span><strong><%= settings.federationChannelName %></strong></div>
           <% } %>
-          <div class="nl-kv"><span>Node ID</span><code><%= settings.federationNodeId %></code></div>
+          <div class="nl-kv"><span>Federation Node ID</span><code><%= settings.federationNodeId %></code></div>
           <div class="nl-kv"><span>Hub</span><strong><%= settings.federationHubUrl %></strong></div>
-          <div class="nl-kv"><span>Public node</span><strong><%= settings.federationPublicUrl %></strong></div>
+          <div class="nl-kv"><span>Transport</span><strong><%= settings.federationTransportMode === 'tunnel' ? 'NekoLive Proxy / outbound tunnel' : 'Direct Selfhost playback' %></strong></div>
+          <% if (settings.federationTransportMode === 'direct') { %><div class="nl-kv"><span>Public node</span><strong><%= settings.federationPublicUrl || 'Not set' %></strong></div><% } %>
           <div class="nl-kv"><span>Last callback</span><strong><%= settings.federationLastSeenAt ? settings.federationLastSeenAt.toISOString() : 'Waiting for heartbeat' %></strong></div>
-          <p class="nl-help">The NekoLive hub owns the linked channel identity. Changing the local Selfhost channel name cannot move this node to another NekoLive account. To change accounts/channels, disconnect and generate a new code while signed into the other NekoLive account.</p>
-          <p class="nl-help">A central block/termination only removes this channel from NekoLive federation. Your local Selfhost stream keeps running.</p>
+
+          <form method="POST" action="/admin/federation/relay" style="margin-top:1rem;">
+            <input type="hidden" name="enabled" value="<%= settings.federationRelayEnabled ? 'false' : 'true' %>" />
+            <button class="nl-btn <%= settings.federationRelayEnabled ? 'secondary' : '' %>" type="submit"><%= settings.federationRelayEnabled ? 'Turn NekoLive relay OFF' : 'Turn NekoLive relay ON' %></button>
+          </form>
+
+          <% if (!settings.federationGuestNode) { %>
+            <p class="nl-help">The NekoLive hub owns the linked channel identity. Changing the local Selfhost channel name cannot move this node to another account. To change channels, disconnect and pair again while signed into the other account.</p>
+          <% } else { %>
+            <p class="nl-help">Guest mode is not a fake NekoLive account. It is only a federation relay identity, so there are no generated account credentials to steal or maintain.</p>
+          <% } %>
+          <p class="nl-help">A central block affects NekoLive federation only. Your local Selfhost stream remains available locally.</p>
           <form method="POST" action="/admin/federation/disconnect" onsubmit="return confirm('Disconnect this node from NekoLive? Your local stream will keep working.');"><button class="nl-btn danger" type="submit">Disconnect relay node</button></form>
         <% } %>
       </section>
@@ -116,6 +160,21 @@
       }
       window.open(hub + '/streamnode/federation/connect', '_blank', 'noopener,noreferrer');
     }
+
+    function updateFederationTransportHelp() {
+      const select = document.getElementById('nl-federation-transport');
+      const field = document.getElementById('nl-federation-public-url-field');
+      const input = document.getElementById('nl-federation-public-url');
+      const help = document.getElementById('nl-federation-transport-help');
+      if (!select || !field || !input || !help) return;
+      const direct = select.value === 'direct';
+      field.style.display = direct ? 'block' : 'none';
+      input.required = direct;
+      help.textContent = direct
+        ? 'Viewers connect directly to this Selfhost URL. The node must have a reachable HTTPS hostname.'
+        : 'Selfhost opens an outbound encrypted WebSocket to NekoLive. No public Selfhost hostname, inbound web port or Cloudflare Tunnel is required.';
+    }
+    updateFederationTransportHelp();
   </script>
   <script src="/js/admin.js"></script>
 </body>
