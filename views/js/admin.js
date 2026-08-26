@@ -132,7 +132,7 @@
 // Replace the server-rendered game <select> with the same searchable picker
 // pattern used by WEBLIVE. The hidden channelGame field is the only value that
 // gets submitted, and game-picker.js only fills it after the user selects an
-// exact game returned by https://nekolive.co.uk/api/games.
+// exact game returned by NekoLive's canonical /api/games catalogue.
 (function () {
   "use strict";
 
@@ -142,7 +142,7 @@
   const currentGame = String(oldSelect.value || "").trim();
   const picker = document.createElement("div");
   picker.id = "nl-game-picker";
-  picker.dataset.gamesApi = "https://nekolive.co.uk/api/games";
+  picker.dataset.gamesApi = "/admin/games/search";
 
   const search = document.createElement("input");
   search.id = "game-search";
@@ -199,7 +199,7 @@
   const existingHelp = picker.parentElement?.querySelector(".nl-help");
   if (existingHelp) {
     existingHelp.textContent =
-      "Type a game name and select the exact result from NekoLive. Results come live from nekolive.co.uk/api/games. Clearing the field saves Uncategorized.";
+      "Type a game name and select the exact result from NekoLive. Results are searched live from nekolive.co.uk/api/games. Clearing the field saves Uncategorized.";
   }
 
   const script = document.createElement("script");
