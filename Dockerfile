@@ -23,6 +23,8 @@ RUN node --check app.js \
  && node --check services/nodeIdentity.js \
  && node --check services/federationClient.js \
  && node --check services/omeClient.js \
+ && node --check views/js/admin.js \
+ && node --check views/js/game-picker.js \
  && node -e "require('ejs').compile(require('fs').readFileSync('views/admin/dashboard.ejs','utf8'))"
 
 # Only runtime data is declared as a Docker volume. config/ also contains
