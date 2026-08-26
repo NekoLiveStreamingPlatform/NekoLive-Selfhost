@@ -1,19 +1,26 @@
 <%- include('partials/header') %>
-  <div class="nl-auth-wrap">
-    <h1>Log in</h1>
-    <% if (error) { %><div class="nl-error"><%= error %></div><% } %>
-    <form method="POST" action="/login">
-      <div class="nl-field">
-        <label class="nl-label">Username</label>
-        <input class="nl-input" type="text" name="username" required maxlength="40" />
+  <main class="nl-auth-wrap">
+    <section class="nl-glass-card nl-auth-card">
+      <div class="nl-auth-brand">
+        <%- include('partials/brand-mark', { brandMarkSize: 38 }) %>
+        <span class="nl-neon-text nl-font-display" style="font-size:1.25rem;font-weight:700;">NekoLive Selfhost</span>
       </div>
-      <div class="nl-field">
-        <label class="nl-label">Password</label>
-        <input class="nl-input" type="password" name="password" required />
-      </div>
-      <button class="nl-btn" type="submit" style="width:100%;">Log in</button>
-    </form>
-    <p style="margin-top:1rem;"><a href="/">&larr; Back to channel</a></p>
-  </div>
+      <h1>Admin login</h1>
+      <p class="nl-auth-subtitle">Sign in to manage your local channel, relay node, multistream destinations and moderation.</p>
+      <% if (error) { %><div class="nl-error"><%= error %></div><% } %>
+      <form method="POST" action="/login">
+        <div class="nl-field">
+          <label class="nl-label">Username</label>
+          <input class="nl-input" type="text" name="username" autocomplete="username" required maxlength="40" />
+        </div>
+        <div class="nl-field">
+          <label class="nl-label">Password</label>
+          <input class="nl-input" type="password" name="password" autocomplete="current-password" required />
+        </div>
+        <button class="nl-btn" type="submit" style="width:100%;">Log in</button>
+      </form>
+      <p class="nl-auth-footer"><a href="/">&larr; Back to channel</a></p>
+    </section>
+  </main>
 </body>
 </html>
