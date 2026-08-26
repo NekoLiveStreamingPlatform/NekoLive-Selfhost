@@ -128,3 +128,82 @@
 
   loadTargets();
 })();
+
+// Replace the server-rendered game <select> with the same searchable picker
+// pattern used by WEBLIVE. The hidden channelGame field is the only value that
+// gets submitted, and game-picker.js only fills it after the user selects an
+// exact game returned by https://nekolive.co.uk/api/games.
+(function () {
+  "use strict";
+
+  const oldSelect = document.querySelector('select[name="channelGame"]');
+  if (!oldSelect) return;
+
+  const currentGame = String(oldSelect.value || "").trim();
+  const picker = document.createElement("div");
+  picker.id = "nl-game-picker";
+  picker.dataset.gamesApi = "https://nekolive.co.uk/api/games";
+
+  const search = document.createElement("input");
+  search.id = "game-search";
+  search.type = "text";
+  search.className = "nl-input";
+  search.placeholder = "Type to search NekoLive games...";
+  search.autocomplete = "off";
+  search.value = currentGame;
+  search.setAttribute("aria-autocomplete", "list");
+  search.setAttribute("aria-controls", "game-select");
+
+  const hidden = document.createElement("input");
+  hidden.id = "channel-game";
+  hidden.type = "hidden";
+  hidden.name = "channelGame";
+  hidden.value = currentGame;
+
+  const results = document.createElement("select");
+  results.id = "game-select";
+  results.className = "nl-input";
+  results.size = 6;
+  results.style.display = "none";
+  results.style.marginTop = ".5rem";
+  results.setAttribute("aria-label", "Matching NekoLive games");
+
+  const actions = document.createElement("div");
+  actions.style.marginTop = ".5rem";
+  actions.style.display = "flex";
+  actions.style.alignItems = "center";
+  actions.style.gap = ".5rem";
+  actions.style.flexWrap = "wrap";
+
+  const clear = document.createElement("button");
+  clear.id = "game-clear";
+  clear.type = "button";
+  clear.className = "nl-btn secondary";
+  clear.textContent = "Set Uncategorized";
+
+  const status = document.createElement("p");
+  status.id = "no-game-found";
+  status.className = "nl-help";
+  status.style.margin = "0";
+  status.style.display = currentGame ? "block" : "none";
+  status.textContent = currentGame ? `Selected: ${currentGame}` : "";
+
+  actions.appendChild(clear);
+  actions.appendChild(status);
+  picker.appendChild(search);
+  picker.appendChild(hidden);
+  picker.appendChild(results);
+  picker.appendChild(actions);
+  oldSelect.replaceWith(picker);
+
+  const existingHelp = picker.parentElement?.querySelector(".nl-help");
+  if (existingHelp) {
+    existingHelp.textContent =
+      "Type a game name and select the exact result from NekoLive. Results come live from nekolive.co.uk/api/games. Clearing the field saves Uncategorized.";
+  }
+
+  const script = document.createElement("script");
+  script.src = "/js/game-picker.js";
+  script.defer = false;
+  document.body.appendChild(script);
+})();
