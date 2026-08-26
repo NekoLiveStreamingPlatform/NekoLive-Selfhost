@@ -16,11 +16,6 @@
 
   let lastLiveState = null;
 
-  // ---------- Video status polling ----------
-  // Playback itself (play/pause/mute/volume/quality/PiP/fullscreen/stall
-  // recovery) is entirely owned by /js/player.js — the same player used on
-  // the main NekoLive site's channel page. This just tells it when to
-  // start/stop via window.initializeMediaElementPlayer/destroyStreamPlayer.
   async function pollStatus() {
     try {
       const res = await fetch("/api/stream/status", { cache: "no-store" });
@@ -40,9 +35,6 @@
         offlineOverlay.style.display = "flex";
       }
 
-      // Only start/stop when the live state actually changes — avoids
-      // tearing down and reconnecting a perfectly fine HLS session on every
-      // single poll.
       if (data.live !== lastLiveState) {
         lastLiveState = data.live;
         if (data.live && data.llhlsUrl) {
@@ -58,15 +50,29 @@
   pollStatus();
   setInterval(pollStatus, STATUS_POLL_MS);
 
-  // ---------- Chat ----------
   const DISPLAY_NAME_KEY = "nl_selfhost_display_name";
   let displayName = localStorage.getItem(DISPLAY_NAME_KEY) || "";
   let ws = null;
   let pingTimer = null;
 
-  function appendChatMessage(name, message) {
+  function appendChatMessage(name, message, sourceLabel) {
     const line = document.createElement("div");
     line.className = "nl-chat-message";
+
+    if (sourceLabel) {
+      const source = document.createElement("span");
+      source.textContent = sourceLabel;
+      source.style.display = "inline-block";
+      source.style.marginRight = ".4rem";
+      source.style.padding = ".1rem .35rem";
+      source.style.border = "1px solid var(--border)";
+      source.style.borderRadius = ".35rem";
+      source.style.fontSize = ".65rem";
+      source.style.fontWeight = "700";
+      source.style.letterSpacing = ".04em";
+      line.appendChild(source);
+    }
+
     const nameSpan = document.createElement("span");
     nameSpan.className = "nl-chat-name";
     nameSpan.textContent = name + ":";
@@ -106,16 +112,12 @@
         return;
       }
       if (data.type === "joined") appendSystemMessage("Connected to chat.");
-      else if (data.type === "chat_message") appendChatMessage(data.displayName, data.message);
+      else if (data.type === "chat_message") appendChatMessage(data.displayName, data.message, data.sourceLabel || "SELFHOST");
       else if (data.type === "viewer_count") viewerCountEl.textContent = `${data.count} watching`;
       else if (data.type === "banned") appendSystemMessage("You have been banned.");
     };
     ws.onclose = () => {
       clearInterval(pingTimer);
-      // Visible instead of a silently empty chat box — if this keeps
-      // reappearing every few seconds, the WebSocket upgrade for /ws/chat
-      // isn't reaching this app at all (commonly a reverse proxy in front
-      // of it not forwarding the Upgrade/Connection headers for that path).
       appendSystemMessage("Chat disconnected — reconnecting...");
       setTimeout(connectChat, 3000);
     };
