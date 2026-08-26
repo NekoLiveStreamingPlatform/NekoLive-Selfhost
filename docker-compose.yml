@@ -5,10 +5,10 @@ services:
     ports:
       - "8090:8090"
     volumes:
-      # config/config.json and the SQLite file both live on the host so they
-      # survive `docker compose down`/rebuilds — neither should ever be
-      # baked into the image (see .dockerignore).
-      - ./config:/app/config
+      # Mount only the mutable runtime config file. Mounting the entire
+      # ./config directory would hide /app/config/loader.js shipped in the
+      # image and cause the app to crash with MODULE_NOT_FOUND.
+      - ./config/config.json:/app/config/config.json:ro
       - ./data:/app/data
     restart: unless-stopped
   ome:
