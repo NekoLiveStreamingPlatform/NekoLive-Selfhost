@@ -179,6 +179,16 @@ router.post("/federation/relay", async (req, res) => {
   res.redirect("/admin");
 });
 
+router.post("/federation/unlink", async (req, res) => {
+  try {
+    const settings = await federationClient.unlinkAccountToGuest();
+    req.session.federationMessage = `NekoLive account unlinked. Node ${settings.federationNodeId} is now running in guest relay mode as ${settings.federationChannelName}.`;
+  } catch (error) {
+    req.session.federationMessage = error.message;
+  }
+  res.redirect("/admin");
+});
+
 router.post("/federation/disconnect", async (req, res) => {
   await federationClient.disconnect();
   req.session.federationMessage = "NekoLive federation link removed. Your local stream is unchanged.";
