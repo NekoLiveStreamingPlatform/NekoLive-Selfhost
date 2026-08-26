@@ -18,6 +18,13 @@ Settings.init(
     // node identity + HMAC secret, so linking a Selfhost node never requires
     // copying a broadcast key into the central NekoLive service.
     federationEnabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    federationRelayEnabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+    federationGuestNode: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    federationTransportMode: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: "direct"
+    },
     federationHubUrl: { type: DataTypes.STRING(500), allowNull: true },
     federationPublicUrl: { type: DataTypes.STRING(500), allowNull: true },
     federationNodeId: { type: DataTypes.STRING(80), allowNull: true },
