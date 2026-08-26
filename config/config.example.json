@@ -3,10 +3,11 @@
   "siteUrl": "http://localhost:8090",
   "sessionSecret": "change-this-to-a-long-random-string",
   "ome": {
-    "apiUrl": "http://127.0.0.1:8081/",
+    "apiUrl": "http://ome:8081/",
     "apiAccessToken": "your-ome-access-token",
-    "playerurl": "http://YOUR-PUBLIC-OR-LAN-IP:8080/",
-    "webrtcurl": "http://YOUR-PUBLIC-OR-LAN-IP:3333/",
+    "playerurl": "http://ome:8080/",
+    "webrtcurl": "http://ome:3333/",
+    "proxyPlayback": true,
     "appName": "app",
     "streamName": "live"
   }
