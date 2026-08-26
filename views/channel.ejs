@@ -1,49 +1,52 @@
 <%- include('partials/header') %>
-  <div class="nl-nav">
-    <span class="brand"><%= channelName %></span>
-    <span>
+  <nav class="nl-nav">
+    <a class="nl-nav-brand" href="/">
+      <%- include('partials/brand-mark', { brandMarkSize: 30 }) %>
+      <span class="nl-neon-text"><%= channelName %></span>
+      <span class="nl-status-dot">SELFHOST</span>
+    </a>
+    <div class="nl-nav-actions">
       <% if (isLoggedIn) { %>
         <a class="nl-btn secondary" href="/admin">Admin</a>
-        <form method="POST" action="/logout" style="display:inline;">
-          <button class="nl-btn secondary" type="submit">Log out</button>
-        </form>
+        <form method="POST" action="/logout"><button class="nl-btn secondary" type="submit">Log out</button></form>
       <% } else { %>
         <a class="nl-btn secondary" href="/login">Admin login</a>
       <% } %>
-    </span>
-  </div>
+    </div>
+  </nav>
 
-  <div class="nl-channel-layout">
-    <div class="nl-video-col">
+  <main class="nl-channel-layout">
+    <section class="nl-video-col">
       <div class="nl-video-frame" id="nl-video-frame">
         <video id="stream-video" playsinline></video>
         <div id="nl-offline-overlay" class="nl-offline-overlay">Offline</div>
       </div>
-      <div>
-        <span id="nl-live-badge" class="nl-offline-badge">OFFLINE</span>
-        <span id="nl-viewer-count" style="color: var(--muted); font-size: 0.85rem; margin-left: 0.5rem;">0 watching</span>
+      <div class="nl-glass-card nl-stream-meta">
+        <div class="nl-stream-status">
+          <span id="nl-live-badge" class="nl-offline-badge">OFFLINE</span>
+          <span id="nl-viewer-count" class="nl-viewer-count">0 watching</span>
+        </div>
+        <h2 id="nl-stream-title" class="nl-stream-title"><%= channelTitle %></h2>
+        <% if (channelBio) { %><p class="nl-stream-bio"><%= channelBio %></p><% } %>
       </div>
-      <h2 id="nl-stream-title" style="margin: 0.25rem 0;"><%= channelTitle %></h2>
-      <% if (channelBio) { %><p style="color: var(--muted);"><%= channelBio %></p><% } %>
-    </div>
+    </section>
 
-    <div class="nl-chat-col">
+    <aside class="nl-chat-col">
+      <div class="nl-chat-header">Stream Chat</div>
       <div id="nl-chat-feed" class="nl-chat-feed"></div>
       <div id="nl-chat-name-row" class="nl-chat-input-row">
         <input id="nl-chat-name-input" class="nl-input" type="text" placeholder="Pick a display name" maxlength="24" />
-        <button id="nl-chat-name-save" class="nl-btn">Join chat</button>
+        <button id="nl-chat-name-save" class="nl-btn">Join</button>
       </div>
       <div id="nl-chat-input-row" class="nl-chat-input-row" style="display:none;">
         <input id="nl-chat-input" class="nl-input" type="text" placeholder="Say something" maxlength="500" />
         <button id="nl-chat-send" class="nl-btn">Send</button>
       </div>
-    </div>
-  </div>
+    </aside>
+  </main>
 
   <link rel="stylesheet" href="/css/nl-player.css" />
-  <script>
-    window.NL_ADMIN_TOKEN = <%- adminChatToken ? JSON.stringify(adminChatToken) : 'null' %>;
-  </script>
+  <script>window.NL_ADMIN_TOKEN = <%- adminChatToken ? JSON.stringify(adminChatToken) : 'null' %>;</script>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
   <script src="/js/player.js"></script>
   <script src="/js/channel.js"></script>

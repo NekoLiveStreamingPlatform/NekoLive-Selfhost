@@ -1,0 +1,23 @@
+<svg
+  viewBox="0 0 64 64"
+  xmlns="http://www.w3.org/2000/svg"
+  class="nl-brand-mark <%= typeof brandMarkClass !== 'undefined' ? brandMarkClass : '' %>"
+  width="<%= typeof brandMarkSize !== 'undefined' ? brandMarkSize : 32 %>"
+  height="<%= typeof brandMarkSize !== 'undefined' ? brandMarkSize : 32 %>"
+  aria-hidden="true"
+>
+  <defs>
+    <linearGradient id="nlBrandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a855f7" />
+      <stop offset="55%" stop-color="#ec4899" />
+      <stop offset="100%" stop-color="#22d3ee" />
+    </linearGradient>
+  </defs>
+  <path d="M14 6 L24 24 L10 26 Z" fill="url(#nlBrandGrad)" opacity="0.9" />
+  <path d="M50 6 L54 26 L40 24 Z" fill="url(#nlBrandGrad)" opacity="0.9" />
+  <circle cx="32" cy="36" r="20" fill="none" stroke="url(#nlBrandGrad)" stroke-width="2.5" />
+  <circle cx="24" cy="32" r="2.4" fill="#e7e3f7" />
+  <circle cx="40" cy="32" r="2.4" fill="#e7e3f7" />
+  <path d="M24 44 Q32 50 40 44" stroke="url(#nlBrandGrad)" stroke-width="2.2" fill="none" stroke-linecap="round" />
+  <path d="M32 16 L32 24" stroke="url(#nlBrandGrad)" stroke-width="2" stroke-linecap="round" />
+</svg>

@@ -90,7 +90,11 @@ async function heartbeat() {
 
     const config = loadConfig();
     const live = liveDetection.getState();
-    const playback = resolveOmePlaybackUrls(config.ome, config.ome.streamName);
+    const playback = resolveOmePlaybackUrls(
+      config.ome,
+      config.ome.streamName,
+      settings.federationPublicUrl || config.siteUrl
+    );
     const payload = {
       publicUrl: settings.federationPublicUrl,
       channel: {

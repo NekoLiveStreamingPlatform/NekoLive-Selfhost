@@ -1,15 +1,18 @@
 <%- include('../partials/header') %>
-  <div class="nl-nav">
-    <a class="brand" href="/">NekoLive <span>Selfhost</span></a>
+  <nav class="nl-nav">
+    <a class="nl-nav-brand" href="/">
+      <%- include('../partials/brand-mark', { brandMarkSize: 30 }) %>
+      <span class="nl-neon-text">NekoLive Selfhost</span>
+    </a>
     <div class="nl-nav-actions">
       <a class="nl-btn secondary" href="/">View channel</a>
       <form method="POST" action="/logout"><button class="nl-btn secondary" type="submit">Log out</button></form>
     </div>
-  </div>
+  </nav>
 
   <main class="nl-shell">
     <div class="nl-page-heading">
-      <div><p class="nl-eyebrow">CREATOR CONTROL</p><h1>Admin Dashboard</h1><p>Manage your local channel, relay node and moderation from one place.</p></div>
+      <div><p class="nl-eyebrow">CREATOR CONTROL</p><h1 class="nl-neon-text">Admin Dashboard</h1><p>Manage your local channel, relay node and moderation from one place.</p></div>
       <span class="nl-status-dot">SELF-HOSTED</span>
     </div>
 

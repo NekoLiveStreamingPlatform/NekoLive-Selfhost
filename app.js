@@ -12,6 +12,7 @@ const admissionRouter = require("./routes/api/admission");
 const streamRouter = require("./routes/api/stream");
 const multistreamRouter = require("./routes/api/multistream");
 const federationRouter = require("./routes/api/federation");
+const omeProxyRouter = require("./routes/api/omeProxy");
 const chatServer = require("./chat/chatServer");
 const liveDetection = require("./services/liveDetection");
 const federationClient = require("./services/federationClient");
@@ -41,6 +42,9 @@ app.use(
 app.use("/api/admission/ome", admissionRouter);
 app.use(requireSetupComplete);
 
+// Browser-facing OME playback stays on the Selfhost origin. The configured
+// OME player/WebRTC URLs can therefore be Docker/LAN-only addresses.
+app.use("/ome", omeProxyRouter);
 app.use("/api/stream", streamRouter);
 app.use("/api/multistream", multistreamRouter);
 app.use("/api/federation", federationRouter);

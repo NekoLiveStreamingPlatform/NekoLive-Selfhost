@@ -18,19 +18,18 @@ services:
     env_file:
       - .env
     expose:
+      # Internal HTTP endpoints consumed by nekolive-selfhost over the Docker
+      # network. They do not need separate public host ports/domains.
+      - "3333"
+      - "8080"
+      - "8081"
       - "1935"
       - "9999/udp"
     ports:
       - 9077:9000/tcp
       - 1935:1935/tcp
       - 9999:9999/udp
-      - 3333:3333/tcp
       - 3478:3478/tcp
       - 10000-10004:10000-10004/udp
-      - 127.0.0.1:8081:8081/tcp
-      # LLHLS playback (Server.xml's Bind/Publishers/LLHLS port) — viewers'
-      # browsers fetch this directly, so it needs to be published, unlike
-      # 8081 (the Manager API, only ever called container-to-container).
-      - 8080:8080/tcp
     volumes:
       - ./ome/Server.xml:/opt/ovenmediaengine/bin/origin_conf/Server.xml
