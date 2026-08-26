@@ -9,6 +9,7 @@ const federationClient = require("../services/federationClient");
 
 const router = express.Router();
 const BCRYPT_ROUNDS = 12;
+const NEKOLIVE_HUB_URL = "https://nekolive.co.uk";
 router.use(ensureAuthenticated);
 
 router.get("/", async (req, res) => {
@@ -22,6 +23,7 @@ router.get("/", async (req, res) => {
     settings,
     bans,
     siteUrl: config.siteUrl || "",
+    nekoliveHubUrl: NEKOLIVE_HUB_URL,
     nodeIdentity: federationClient.getNodeIdentity(),
     messages: { channel: null, account: null, ban: null, federation: federationMessage }
   });
@@ -85,7 +87,7 @@ router.post("/federation/pair", async (req, res) => {
   try {
     const transportMode = req.body.transportMode === "tunnel" ? "tunnel" : "direct";
     const settings = await federationClient.pair({
-      hubUrl: req.body.hubUrl,
+      hubUrl: NEKOLIVE_HUB_URL,
       publicUrl: req.body.publicUrl,
       pairingCode: req.body.pairingCode,
       transportMode
@@ -101,7 +103,7 @@ router.post("/federation/pair", async (req, res) => {
 
 router.post("/federation/guest", async (req, res) => {
   try {
-    const settings = await federationClient.registerGuest({ hubUrl: req.body.hubUrl });
+    const settings = await federationClient.registerGuest({ hubUrl: NEKOLIVE_HUB_URL });
     req.session.federationMessage = `Anonymous NekoLive relay enabled as ${settings.federationChannelName}. No NekoLive account was created.`;
   } catch (error) {
     req.session.federationMessage = error.message;
