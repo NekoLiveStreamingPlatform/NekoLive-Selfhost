@@ -1,27 +1,33 @@
 <%- include('partials/header') %>
-  <div class="nl-auth-wrap">
-    <h1>Set up your channel</h1>
-    <p style="color: var(--muted); font-size: 0.85rem;">This runs once. Creates your admin account and your channel's name.</p>
-    <% if (error) { %><div class="nl-error"><%= error %></div><% } %>
-    <form method="POST" action="/setup">
-      <div class="nl-field">
-        <label class="nl-label">Your username</label>
-        <input class="nl-input" type="text" name="username" required maxlength="40" />
+  <main class="nl-auth-wrap">
+    <section class="nl-glass-card nl-auth-card">
+      <div class="nl-auth-brand">
+        <%- include('partials/brand-mark', { brandMarkSize: 42 }) %>
+        <span class="nl-neon-text nl-font-display" style="font-size:1.25rem;font-weight:700;">NekoLive Selfhost</span>
       </div>
-      <div class="nl-field">
-        <label class="nl-label">Your email</label>
-        <input class="nl-input" type="email" name="email" required maxlength="120" />
-      </div>
-      <div class="nl-field">
-        <label class="nl-label">Password (min 8 characters)</label>
-        <input class="nl-input" type="password" name="password" required minlength="8" />
-      </div>
-      <div class="nl-field">
-        <label class="nl-label">Channel name</label>
-        <input class="nl-input" type="text" name="channelName" required maxlength="40" placeholder="e.g. your-name" />
-      </div>
-      <button class="nl-btn" type="submit" style="width:100%;">Create account</button>
-    </form>
-  </div>
+      <h1>Set up your channel</h1>
+      <p class="nl-auth-subtitle">Create the local owner account and channel identity for this Selfhost node. You only do this once.</p>
+      <% if (error) { %><div class="nl-error"><%= error %></div><% } %>
+      <form method="POST" action="/setup">
+        <div class="nl-field">
+          <label class="nl-label">Your username</label>
+          <input class="nl-input" type="text" name="username" autocomplete="username" required maxlength="40" />
+        </div>
+        <div class="nl-field">
+          <label class="nl-label">Your email</label>
+          <input class="nl-input" type="email" name="email" autocomplete="email" required maxlength="120" />
+        </div>
+        <div class="nl-field">
+          <label class="nl-label">Password (minimum 8 characters)</label>
+          <input class="nl-input" type="password" name="password" autocomplete="new-password" required minlength="8" />
+        </div>
+        <div class="nl-field">
+          <label class="nl-label">Channel name</label>
+          <input class="nl-input" type="text" name="channelName" required maxlength="40" placeholder="e.g. your-name" />
+        </div>
+        <button class="nl-btn" type="submit" style="width:100%;">Create Selfhost</button>
+      </form>
+    </section>
+  </main>
 </body>
 </html>
