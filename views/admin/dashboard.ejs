@@ -86,11 +86,18 @@
             </form>
           </div>
         <% } else { %>
+          <% const permanentNodeUrl = nekoliveHubUrl + '/node/' + settings.federationNodeId; %>
           <% if (settings.federationChannelName) { %>
             <div class="nl-kv"><span><%= settings.federationGuestNode ? 'Public Selfhost name' : 'Linked NekoLive channel' %></span><strong><%= settings.federationChannelName %></strong></div>
           <% } %>
           <% if (settings.channelGame) { %><div class="nl-kv"><span>Game category</span><strong><%= settings.channelGame %></strong></div><% } %>
           <div class="nl-kv"><span>Federation Node ID</span><code><%= settings.federationNodeId %></code></div>
+          <div class="nl-field" style="margin-top:1rem;">
+            <label class="nl-label">Permanent NekoLive Node URL</label>
+            <input class="nl-input" type="text" readonly value="<%= permanentNodeUrl %>" onclick="this.select()" />
+            <p class="nl-help">This URL always belongs to this Node ID. In guest mode it opens the guest stream. While linked to an account it automatically redirects to that account's normal NekoLive channel page.</p>
+            <a class="nl-btn secondary" href="<%= permanentNodeUrl %>" target="_blank" rel="noopener noreferrer" style="margin-top:.5rem; display:inline-flex;">Open Node URL</a>
+          </div>
           <div class="nl-kv"><span>Hub</span><strong><%= settings.federationHubUrl %></strong></div>
           <div class="nl-kv"><span>Transport</span><strong><%= settings.federationTransportMode === 'tunnel' ? 'NekoLive Proxy / outbound tunnel' : 'Direct Selfhost playback' %></strong></div>
           <% if (settings.federationTransportMode === 'direct') { %><div class="nl-kv"><span>Public node</span><strong><%= settings.federationPublicUrl || 'Not set' %></strong></div><% } %>
@@ -101,13 +108,30 @@
             <button class="nl-btn <%= settings.federationRelayEnabled ? 'secondary' : '' %>" type="submit"><%= settings.federationRelayEnabled ? 'Turn NekoLive relay OFF' : 'Turn NekoLive relay ON' %></button>
           </form>
 
-          <% if (!settings.federationGuestNode) { %>
-            <p class="nl-help">The NekoLive hub owns the linked channel identity. Changing the local Selfhost channel name cannot move this node to another account. To change channels, disconnect and pair again while signed into the other account.</p>
-          <% } else { %>
+          <% if (settings.federationGuestNode) { %>
+            <div style="margin-top:1.5rem; padding-top:1.25rem; border-top:1px solid var(--border);">
+              <h3>Link this Node ID to your NekoLive account</h3>
+              <p class="nl-help">Your permanent Node ID stays <code><%= settings.federationNodeId %></code>. Generate a one-time code while signed into the NekoLive account you own, then pair it here. The permanent <code>/node/&lt;id&gt;</code> URL will redirect to the linked <code>/channel/&lt;name&gt;</code> page.</p>
+              <button class="nl-btn secondary" type="button" style="margin-bottom:1rem;" onclick="openNekoLivePairingHub()">Open NekoLive pairing hub</button>
+              <form method="POST" action="/admin/federation/pair">
+                <input type="hidden" name="transportMode" value="tunnel" />
+                <div class="nl-field"><label class="nl-label">One-time pairing code</label><input class="nl-input" name="pairingCode" autocomplete="one-time-code" required /><p class="nl-help">This upgrades the existing guest node to your owned NekoLive channel; it does not create a new Node ID.</p></div>
+                <button class="nl-btn" type="submit">Link this Node ID to my account</button>
+              </form>
+            </div>
             <p class="nl-help">Guest mode is not a fake NekoLive account. Its friendly name is display-only and the immutable Node ID remains the actual federation identity.</p>
+          <% } else { %>
+            <div style="margin-top:1.5rem; padding-top:1.25rem; border-top:1px solid var(--border);">
+              <h3>Linked account</h3>
+              <p class="nl-help">This node is bound to the NekoLive account that owns <strong><%= settings.federationChannelName %></strong>. Changing the local Selfhost channel name cannot move the node to another account.</p>
+              <form method="POST" action="/admin/federation/unlink" onsubmit="return confirm('Unlink this NekoLive account and return this same Node ID to guest mode? The Node ID and permanent /node URL will stay the same.');">
+                <button class="nl-btn secondary" type="submit">Unlink account → guest mode</button>
+              </form>
+            </div>
           <% } %>
+
           <p class="nl-help">A central block affects NekoLive federation only. Your local Selfhost stream remains available locally.</p>
-          <form method="POST" action="/admin/federation/disconnect" onsubmit="return confirm('Disconnect this node from NekoLive? Your local stream will keep working.');"><button class="nl-btn danger" type="submit">Disconnect relay node</button></form>
+          <form method="POST" action="/admin/federation/disconnect" onsubmit="return confirm('Disconnect this node from NekoLive completely? Your local stream will keep working, but this Selfhost install will need to register/pair again to use NekoLive relay.');"><button class="nl-btn danger" type="submit">Disconnect relay node</button></form>
         <% } %>
       </section>
 
